@@ -35,11 +35,55 @@ export class AIError extends Error {
 }
 
 /**
- * Gemini models tried in order when Google reports one as not found or
- * retired (404). The first one that works is remembered.
+ * Gemini models tried in order. If one is not found (404), MedLens asks
+ * Google which models this API key can use and tries the best "flash" ones,
+ * so a renamed or retired model never breaks the site. The first model that
+ * works after a 404 is remembered.
  */
-export const GEMINI_MODELS = ["gemini-3.8-flash", "gemini-3.8-flash-lite", "gemini-2.5-flash"];
+export const GEMINI_MODELS = ["gemini-3.8-flash", "gemini-3.8-flash-lite"];
 let workingGeminiModel: string | null = null;
+
+/** Rank model ids for document work: newest version first, full before lite, stable before preview. */
+export function rankGeminiModels(ids: string[]): string[] {
+  const version = (id: string) => Number(/gemini-(\d+(?:\.\d+)?)/.exec(id)?.[1] ?? 0);
+  return ids
+    .filter((id) => /^gemini-\d/.test(id) && /flash/.test(id) && !/tts|image|audio|live|embed|native|robotics|computer|thinking-exp/.test(id))
+    .sort(
+      (a, b) =>
+        version(b) - version(a) ||
+        Number(/lite/.test(a)) - Number(/lite/.test(b)) ||
+        Number(/preview|exp/.test(a)) - Number(/preview|exp/.test(b)) ||
+        a.length - b.length,
+    );
+}
+
+let modelList: { at: number; ids: string[] } | null = null;
+/** Models this key can call with generateContent, best first (cached for an hour). */
+export async function listGeminiModels(apiKey: string, signal?: AbortSignal): Promise<string[]> {
+  if (modelList && Date.now() - modelList.at < 60 * 60_000) return modelList.ids;
+  try {
+    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000", {
+      headers: { "x-goog-api-key": apiKey },
+      signal,
+    });
+    if (!res.ok) return [];
+    const body = (await res.json()) as { models?: { name?: string; supportedGenerationMethods?: string[] }[] };
+    const ids = (body.models ?? [])
+      .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
+      .map((m) => (m.name ?? "").replace(/^models\//, ""));
+    modelList = { at: Date.now(), ids: rankGeminiModels(ids) };
+    return modelList.ids;
+  } catch {
+    return [];
+  }
+}
+
+/** For tests. */
+export function resetGeminiState() {
+  workingGeminiModel = null;
+  modelList = null;
+  thinkingUnsupported = false;
+}
 
 export function getProviderConfig(): ProviderConfig | null {
   const env = process.env;
@@ -182,13 +226,19 @@ async function callGemini(cfg: ProviderConfig, opts: GenerateOptions, signal: Ab
       }),
     });
 
-  // Try the chosen model, then the others. A retired model (404) is skipped
-  // at once; an overloaded one gets one quick retry before moving on.
-  const models = [model, ...GEMINI_MODELS.filter((m) => m !== model)];
+  // Try the chosen model, then the others. A model that is not found (404)
+  // is skipped at once, and the first 404 makes MedLens ask Google which
+  // models this key has; an overloaded model gets one quick retry first.
+  const queue = [model, ...GEMINI_MODELS.filter((m) => m !== model)];
+  const tried = new Set<string>();
   let res: Response | null = null;
+  let busy = false;
+  let discovered = false;
   let onlyRetiredSkipped = true;
-  for (let i = 0; i < models.length; i++) {
-    const m = models[i];
+  while (queue.length) {
+    const m = queue.shift()!;
+    if (tried.has(m)) continue;
+    tried.add(m);
     for (let attempt = 0; attempt < 2; attempt++) {
       res = await call(m);
       if (res.status === 400 && !thinkingUnsupported && thinkingConfig(m)) {
@@ -206,20 +256,28 @@ async function callGemini(cfg: ProviderConfig, opts: GenerateOptions, signal: Ab
       } else break;
     }
     if (res!.ok) {
-      // Remember a replacement only when the earlier models are gone for good.
-      if (i > 0 && onlyRetiredSkipped) workingGeminiModel = m;
+      if (m !== model && onlyRetiredSkipped) workingGeminiModel = m;
       break;
     }
     if (res!.status === 404) {
-      if (i + 1 < models.length) console.warn(`Gemini model ${m} unavailable (404); trying ${models[i + 1]}`);
+      console.warn(`Gemini model ${m} is not available for this key (404)`);
+      if (!discovered) {
+        discovered = true;
+        const available = await listGeminiModels(cfg.apiKey!, signal);
+        queue.push(...available.filter((x) => !tried.has(x)).slice(0, 4));
+      }
       continue;
     }
-    if (transient(res!.status) && i + 1 < models.length && deadline - Date.now() > 20_000) {
+    if (transient(res!.status)) {
+      busy = true;
       onlyRetiredSkipped = false;
-      console.warn(`Gemini ${m} still returning ${res!.status}; trying ${models[i + 1]}`);
-      continue;
+      if (deadline - Date.now() > 20_000) continue;
     }
     break;
+  }
+  if (!res!.ok && busy) {
+    // Report "busy" rather than a later "not found" from a fallback name.
+    throw new AIError("provider_error", "The AI service is very busy right now. Please wait a moment and try again.", 503);
   }
   const body = await res!.json().catch(() => null);
   if (!res!.ok) {
@@ -229,7 +287,9 @@ async function callGemini(cfg: ProviderConfig, opts: GenerateOptions, signal: Ab
       "provider_error",
       status === 503 || status === 429
         ? "The AI service is very busy right now. Please wait a moment and try again."
-        : `Gemini error (${status}): ${msg}`,
+        : status === 404
+          ? `No Gemini model that MedLens can use is available for this API key (tried: ${[...tried].join(", ")}). Google said: ${msg}`
+          : `Gemini error (${status}): ${msg}`,
       status === 429 ? 429 : status === 503 ? 503 : 502,
     );
   }
