@@ -29,7 +29,7 @@ export function getTtsConfig(): TtsConfig | null {
     googleKey ? { provider: "google", apiKey: googleKey, model: null, voice: env.GOOGLE_TTS_VOICE?.trim() ?? "Chirp3-HD-Kore", baseUrl: null } : null;
   const gemini = (): TtsConfig | null =>
     geminiKey
-      ? { provider: "gemini", apiKey: geminiKey, model: env.GEMINI_TTS_MODEL?.trim() || "gemini-2.5-flash-preview-tts", voice: env.GEMINI_TTS_VOICE?.trim() || "Kore", baseUrl: null }
+      ? { provider: "gemini", apiKey: geminiKey, model: env.GEMINI_TTS_MODEL?.trim() || workingGeminiModel || GEMINI_TTS_MODELS[0], voice: env.GEMINI_TTS_VOICE?.trim() || "Kore", baseUrl: null }
       : null;
   const openai = (): TtsConfig | null =>
     openaiKey
@@ -41,6 +41,10 @@ export function getTtsConfig(): TtsConfig | null {
   if (requested === "openai") return openai();
   return google() ?? gemini() ?? openai();
 }
+
+/** Tried in order when a model is not found (names change between releases). */
+let workingGeminiModel: string | null = null;
+export const GEMINI_TTS_MODELS = ["gemini-3.8-flash-tts", "gemini-3.8-flash-lite-tts", "gemini-2.5-flash-preview-tts"];
 
 export type Synthesized = { audio: Buffer; mimeType: string };
 
@@ -109,19 +113,25 @@ async function googleTts(cfg: TtsConfig, text: string, locale: string, signal: A
 }
 
 async function geminiTts(cfg: TtsConfig, text: string, languageName: string, signal: AbortSignal): Promise<Synthesized> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(cfg.model!)}:generateContent`;
-  const res = await fetch(url, {
-    method: "POST",
-    signal,
-    headers: { "Content-Type": "application/json", "x-goog-api-key": cfg.apiKey },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: `Read aloud in ${languageName}, in a calm, clear and warm voice: ${text}` }] }],
-      generationConfig: {
-        responseModalities: ["AUDIO"],
-        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: cfg.voice } } },
-      },
-    }),
-  });
+  const call = (model: string) =>
+    fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      method: "POST",
+      signal,
+      headers: { "Content-Type": "application/json", "x-goog-api-key": cfg.apiKey },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: `Read aloud in ${languageName}, in a calm, clear and warm voice: ${text}` }] }],
+        generationConfig: {
+          responseModalities: ["AUDIO"],
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: cfg.voice } } },
+        },
+      }),
+    });
+  const models = [cfg.model!, ...GEMINI_TTS_MODELS.filter((m) => m !== cfg.model)];
+  let res = await call(models[0]);
+  for (let i = 1; i < models.length && res.status === 404; i++) {
+    res = await call(models[i]);
+    if (res.ok) cfg.model = workingGeminiModel = models[i]; // remember it for later requests
+  }
   if (!res.ok) await failure(res, "Gemini");
   const body = await res.json();
   const part = body?.candidates?.[0]?.content?.parts?.find((p: { inlineData?: unknown }) => p.inlineData);

@@ -110,3 +110,23 @@ describe("packChunks", async () => {
     expect(out.join(" ")).toBe(sentences.join(" "));
   });
 });
+
+describe("Gemini model fallback", () => {
+  it("tries the next model when one is not found", async () => {
+    process.env.GEMINI_API_KEY = "g";
+    const urls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        urls.push(url);
+        if (!url.includes("2.5")) return new Response(JSON.stringify({ error: { message: "not found" } }), { status: 404 });
+        return Response.json({ candidates: [{ content: { parts: [{ inlineData: { mimeType: "audio/L16;rate=24000", data: "AAAA" } }] } }] });
+      }),
+    );
+    const cfg = getTtsConfig()!;
+    const out = await synthesize(cfg, "fallback unique-5", "en-US", "English");
+    expect(out.mimeType).toBe("audio/wav");
+    expect(urls.map((u) => /models\/([^:]+)/.exec(u)?.[1])).toEqual(["gemini-3.8-flash-tts", "gemini-3.8-flash-lite-tts", "gemini-2.5-flash-preview-tts"]);
+    expect(cfg.model).toBe("gemini-2.5-flash-preview-tts");
+  });
+});
