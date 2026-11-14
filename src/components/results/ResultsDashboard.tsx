@@ -1,0 +1,153 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { AlertTriangle, BookOpen, FileText, HeartPulse, Mic, ScanLine, Wallet, X } from "lucide-react";
+import { useMedLens } from "@/lib/store";
+import { LanguageSelector, TranslationStatus } from "../LanguageSelector";
+import { Badge, btn, cx, Notice } from "../ui";
+import { NoAnalysis } from "./shared";
+import { UnderstandTab } from "./UnderstandTab";
+import { RecoveryTab } from "./RecoveryTab";
+import { WalletTab } from "./WalletTab";
+import { SampleDocumentView } from "./SampleDocumentView";
+
+const TABS = [
+  { id: "understand", label: "Understand Your Health", short: "Understand", icon: BookOpen },
+  { id: "recovery", label: "Recovery & Safety", short: "Recovery", icon: HeartPulse },
+  { id: "wallet", label: "Wallet & Bill Shield", short: "Wallet", icon: Wallet },
+] as const;
+type TabId = (typeof TABS)[number]["id"];
+
+const DOC_TYPE: Record<string, string> = {
+  discharge_summary: "Discharge papers",
+  after_visit_summary: "After-visit summary",
+  prescription_label: "Prescription label",
+  medication_list: "Medication list",
+  lab_results: "Lab results",
+  hospital_bill: "Hospital bill",
+  other: "Medical document",
+  unreadable: "Unreadable document",
+};
+
+export function ResultsDashboard() {
+  const { analysis, hydrated } = useMedLens();
+  const params = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const fromUrl = params.get("tab") as TabId | null;
+  const [tab, setTab] = useState<TabId>(TABS.some((t) => t.id === fromUrl) ? fromUrl! : "understand");
+  const [showDoc, setShowDoc] = useState(false);
+
+  useEffect(() => {
+    if (fromUrl && TABS.some((t) => t.id === fromUrl)) setTab(fromUrl);
+  }, [fromUrl]);
+
+  const select = (id: TabId) => {
+    setTab(id);
+    router.replace(`${pathname}?tab=${id}`, { scroll: false });
+  };
+
+  if (!hydrated) return <div className="h-40 animate-pulse rounded-2xl bg-white" />;
+  if (!analysis) return <NoAnalysis />;
+
+  const date = analysis.discharge_date ?? analysis.visit_date;
+
+  return (
+    <div className="space-y-5">
+      <header className="space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="brand">{DOC_TYPE[analysis.document_type] ?? "Medical document"}</Badge>
+              {analysis.meta.source === "sample" && <Badge tone="amber">Fictional sample</Badge>}
+              {analysis.meta.source === "mock" && <Badge tone="amber">Mock AI — fictional data</Badge>}
+              {analysis.meta.source === "ai" && analysis.meta.model && <Badge>Read by {analysis.meta.model}</Badge>}
+              {analysis.extraction_status === "partial" && <Badge tone="amber">Partly readable</Badge>}
+            </div>
+            <h1 className="mt-2 text-2xl font-bold text-ink">{analysis.facility_name ?? "Your document"}</h1>
+            <p className="text-sm text-ink-muted">
+              {date ? `Visit: ${date}` : "Visit date not listed"} · {analysis.meta.page_count} page{analysis.meta.page_count === 1 ? "" : "s"}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {analysis.meta.source !== "ai" && (
+              <button onClick={() => setShowDoc(true)} className={btn.secondary}>
+                <FileText className="h-4 w-4" /> View document
+              </button>
+            )}
+            <Link href="/scan" className={btn.secondary}>
+              <ScanLine className="h-4 w-4" /> Scan another
+            </Link>
+            <Link href="/assistant" className={btn.secondary}>
+              <Mic className="h-4 w-4" /> Ask a question
+            </Link>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2 rounded-2xl border border-brand-100 bg-brand-50/60 p-3 sm:flex-row sm:items-center">
+          <LanguageSelector />
+          <div className="flex-1">
+            <TranslationStatus />
+            {/* English: explain what the selector does */}
+          </div>
+        </div>
+
+        {analysis.verification_required && analysis.uncertain_fields.length > 0 && (
+          <Notice tone="warning" icon={<AlertTriangle className="h-5 w-5" />}>
+            <p className="font-semibold">Please double-check {analysis.uncertain_fields.length === 1 ? "this item" : "these items"} with your pharmacist or doctor</p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-5">
+              {analysis.uncertain_fields.map((u, i) => (
+                <li key={i}>
+                  <span className="font-medium">{u.field}</span>
+                  {u.reason ? ` — ${u.reason}` : ""}
+                </li>
+              ))}
+            </ul>
+          </Notice>
+        )}
+      </header>
+
+      <div role="tablist" aria-label="Results" className="sticky top-14 z-10 -mx-4 grid grid-cols-3 gap-1 border-b border-slate-200 bg-slate-50/95 px-4 pt-1 backdrop-blur">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            role="tab"
+            id={`tab-${t.id}`}
+            aria-selected={tab === t.id}
+            aria-controls={`panel-${t.id}`}
+            onClick={() => select(t.id)}
+            className={cx(
+              "flex flex-col items-center gap-1 rounded-t-xl border-b-[3px] px-2 py-2.5 text-sm font-semibold sm:flex-row sm:justify-center sm:text-base",
+              tab === t.id ? "border-brand-700 bg-white text-brand-800" : "border-transparent text-ink-muted hover:text-ink",
+            )}
+          >
+            <t.icon className="h-5 w-5" aria-hidden />
+            <span className="sm:hidden">{t.short}</span>
+            <span className="hidden sm:inline">{t.label}</span>
+          </button>
+        ))}
+      </div>
+
+      <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
+        {tab === "understand" && <UnderstandTab />}
+        {tab === "recovery" && <RecoveryTab />}
+        {tab === "wallet" && <WalletTab />}
+      </div>
+
+      {showDoc && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4" role="dialog" aria-modal="true" aria-label="Sample document">
+          <div className="relative w-full max-w-2xl">
+            <button onClick={() => setShowDoc(false)} className="absolute -top-2 right-0 rounded-full bg-white p-2 shadow" aria-label="Close document">
+              <X className="h-5 w-5" />
+            </button>
+            <div className="mt-8">
+              <SampleDocumentView />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
