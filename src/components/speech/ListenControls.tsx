@@ -66,7 +66,7 @@ export function ListenBar({ full, className, sticky = true }: { full: SpeakReque
             onClick={() =>
               s.status === "loading" ? s.stop() : active ? (s.status === "speaking" ? s.pause() : s.resume()) : s.speak(full)
             }
-            className="inline-flex min-h-[56px] items-center justify-center gap-3 rounded-2xl bg-brand-700 px-5 text-lg font-bold text-white shadow hover:bg-brand-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
+            className="inline-flex min-h-[56px] items-center justify-center gap-3 rounded-2xl bg-brand-700 px-5 text-lg font-bold text-white shadow hover:bg-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
             aria-label={
               s.status === "loading"
                 ? tr("Cancel")

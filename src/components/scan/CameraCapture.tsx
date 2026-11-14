@@ -211,7 +211,7 @@ export function CameraCapture({ pageCount, onCapture, onClose, onUnavailable }: 
         </p>
         <div className="flex items-center gap-1">
           {torchSupported && !shot && (
-            <button onClick={toggleTorch} className={cx("rounded-full p-2", torch ? "bg-amber-300 text-black" : "hover:bg-white/10")} aria-pressed={torch} aria-label={torch ? tr("Turn flashlight off") : tr("Turn flashlight on")}>
+            <button onClick={toggleTorch} className={cx("rounded-full p-2", torch ? "bg-amber-400 text-black" : "hover:bg-white/10")} aria-pressed={torch} aria-label={torch ? tr("Turn flashlight off") : tr("Turn flashlight on")}>
               {torch ? <Flashlight className="h-6 w-6" /> : <FlashlightOff className="h-6 w-6" />}
             </button>
           )}
@@ -240,7 +240,7 @@ export function CameraCapture({ pageCount, onCapture, onClose, onUnavailable }: 
           </p>
         )}
         {shot && shot.issues.length > 0 && (
-          <div role="alert" className="absolute inset-x-4 top-4 mx-auto flex max-w-md items-start gap-2 rounded-xl bg-amber-300 px-4 py-3 text-sm font-medium text-black">
+          <div role="alert" className="absolute inset-x-4 top-4 mx-auto flex max-w-md items-start gap-2 rounded-xl bg-amber-400 px-4 py-3 text-sm font-medium text-black">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
             <span>
               {shot.issues.map((i) => tr(ISSUE_TEXT[i].after)).join(" ")} {tr("The text may be misread — consider retaking it.")}

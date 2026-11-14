@@ -80,7 +80,7 @@ export default function AssistantPage() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-ink">
+          <h1 className="flex items-center gap-2 font-display text-4xl font-normal tracking-wide text-ink sm:text-5xl">
             <Mic className="h-7 w-7 text-brand-700" /> {tr("Voice Assistant")}
           </h1>
           <p className="mt-1 text-ink-soft">
@@ -164,7 +164,7 @@ export default function AssistantPage() {
               onClick={() => (rec.listening ? rec.stop() : (speech.stop(), rec.start((txt) => ask(txt))))}
               className={cx(
                 "grid h-14 w-14 shrink-0 place-items-center rounded-full text-white shadow",
-                rec.listening ? "animate-pulse bg-red-600" : "bg-brand-700 hover:bg-brand-800",
+                rec.listening ? "animate-pulse bg-red-600" : "bg-brand-700 hover:bg-brand-600",
               )}
               aria-label={rec.listening ? tr("Stop listening") : tr("Speak your question in {language}", { language: language.native })}
             >

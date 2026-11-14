@@ -1,21 +1,66 @@
+@import url("https://fonts.googleapis.com/css2?family=Italiana&family=Outfit:wght@300;400;500;600;700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial,
-    "Apple Color Emoji", "Segoe UI Emoji";
+  --font-sans: "Outfit", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif;
+  --font-display: "Italiana", "Outfit", serif;
+  --page: #040a14;
+  --surface: #0b1728;
+  --surface-2: #0e1c30;
+  color-scheme: dark;
 }
 
 html {
   -webkit-text-size-adjust: 100%;
+  background: var(--page);
 }
 body {
-  @apply bg-slate-50 text-ink antialiased;
+  @apply text-ink antialiased;
+  background:
+    radial-gradient(1200px 600px at 85% -10%, rgba(20, 170, 182, 0.12), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(40, 80, 200, 0.12), transparent 60%),
+    var(--page);
+  background-attachment: fixed;
 }
+
+/* Cards: the app's light "white" surfaces become deep navy panels. */
+.bg-white {
+  background-color: var(--surface);
+}
+.bg-white\/95,
+.bg-white\/90 {
+  background-color: rgba(11, 23, 40, 0.92);
+}
+.bg-white\/70,
+.bg-white\/60 {
+  background-color: rgba(11, 23, 40, 0.7);
+}
+.hover\:bg-white:hover {
+  background-color: #13243b;
+}
+
+/* Form controls follow the theme (browsers default them to white). */
+input,
+textarea,
+select {
+  background-color: var(--surface-2);
+  color: inherit;
+}
+select option {
+  background-color: var(--surface);
+  color: #edf4fa;
+}
+::placeholder {
+  color: #6c84a3;
+}
+
 :focus-visible {
-  outline-color: #047860;
+  outline-color: #22d3dc;
 }
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -24,10 +69,17 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
 @media print {
   nav,
   header,
   .no-print {
     display: none !important;
+  }
+  html,
+  body,
+  .bg-white {
+    background: #fff !important;
+    color: #000 !important;
   }
 }

@@ -146,7 +146,7 @@ export function DocumentCapture({
               type="button"
               onClick={openCamera}
               disabled={disabled}
-              className="group flex min-h-[150px] flex-col items-start justify-between rounded-3xl bg-brand-700 p-5 text-left text-white shadow-card hover:bg-brand-800 focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-brand-300 disabled:opacity-50"
+              className="group flex min-h-[150px] flex-col items-start justify-between rounded-3xl bg-brand-700 p-5 text-left text-white shadow-card hover:bg-brand-600 focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-brand-300 disabled:opacity-50"
             >
               <span className="grid h-14 w-14 place-items-center rounded-2xl bg-white/15">
                 <Camera className="h-8 w-8" aria-hidden />

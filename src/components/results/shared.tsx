@@ -28,7 +28,7 @@ export function NoAnalysis({ title = "No document scanned yet" }: { title?: stri
           <ScanLine className="h-6 w-6" />
         </span>
         <div>
-          <h1 className="text-xl font-bold text-ink">{tr(title)}</h1>
+          <h1 className="font-display text-3xl font-normal tracking-wide text-ink">{tr(title)}</h1>
           <p className="text-ink-soft">
             {tr("Scan or upload your discharge papers or a medication label to see this page, or try the fictional sample document.")}
           </p>

@@ -68,7 +68,7 @@ export function ResultsDashboard() {
               {analysis.meta.source === "ai" && analysis.meta.model && <Badge>{tr("Read by AI")}</Badge>}
               {analysis.extraction_status === "partial" && <Badge tone="amber">{tr("Partly readable")}</Badge>}
             </div>
-            <h1 className="mt-2 text-2xl font-bold text-ink">{analysis.facility_name ? t("facility", analysis.facility_name) : tr("Your document")}</h1>
+            <h1 className="mt-2 font-display text-4xl font-normal tracking-wide text-ink sm:text-5xl">{analysis.facility_name ? t("facility", analysis.facility_name) : tr("Your document")}</h1>
             <p className="text-sm text-ink-muted">
               {date ? tr("Visit: {date}", { date }) : tr("Visit date not listed")} ·{" "}
               {analysis.meta.page_count === 1 ? tr("1 page") : tr("{count} pages", { count: analysis.meta.page_count })}

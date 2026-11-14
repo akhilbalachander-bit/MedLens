@@ -41,12 +41,12 @@ export function EmergencyBanner() {
   const { t } = useMedLens();
   const tr = useTr();
   return (
-    <div role="alert" className="flex flex-col gap-3 rounded-2xl bg-red-700 p-4 text-white shadow-card sm:flex-row sm:items-center">
+    <div role="alert" className="flex flex-col gap-3 rounded-2xl bg-red-600 p-4 text-white shadow-card sm:flex-row sm:items-center">
       <AlertOctagon className="h-8 w-8 shrink-0" aria-hidden />
       <Localized as="p" className="flex-1 text-lg font-semibold leading-snug">
         {t("ui.emergencyBanner")}
       </Localized>
-      <a href="tel:911" className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-lg font-bold text-red-700 hover:bg-red-50">
+      <a href="tel:911" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#ffffff] px-5 py-3 text-lg font-bold text-[#b91c1c] hover:bg-[#fee2e2]">
         <PhoneCall className="h-5 w-5" /> {tr("Call 911")}
       </a>
     </div>
@@ -68,7 +68,7 @@ const LIGHTS = [
     labelKey: "ui.contact",
     icon: CircleAlert,
     ring: "border-amber-300",
-    head: "bg-amber-400 text-amber-950",
+    head: "bg-amber-400 text-black",
     dot: "bg-amber-500",
     empty: "Your document does not list when to call your doctor. If you are worried about a symptom, call your doctor or nurse line.",
   },

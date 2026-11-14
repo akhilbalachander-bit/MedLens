@@ -324,7 +324,7 @@ function LineTable({ items, flagged, c }: { items: BillLineItem[]; flagged: Map<
 
 function Stat({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
-    <div className={cx("rounded-xl p-3", strong ? "bg-ink text-white" : "bg-slate-50")}>
+    <div className={cx("rounded-xl p-3", strong ? "bg-brand-700 text-white" : "bg-slate-50")}>
       <p className={cx("text-xs", strong ? "text-white/70" : "text-ink-muted")}>{label}</p>
       <p className="text-lg font-bold tabular-nums">{value}</p>
     </div>
