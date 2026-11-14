@@ -64,7 +64,7 @@ See `.env.example`. Key variables:
 | Variable | Meaning |
 | --- | --- |
 | `AI_PROVIDER` | `gemini`, `openai` or `mock`. Auto-detected from keys if unset. |
-| `GEMINI_API_KEY`, `GEMINI_MODEL` | Default model: `gemini-2.5-flash`. |
+| `GEMINI_API_KEY`, `GEMINI_MODEL` | Default model: `gemini-3.8-flash` (falls back automatically if Google retires a model name). |
 | `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_BASE_URL` | Any OpenAI-compatible vision endpoint. |
 | `MAX_UPLOAD_MB_PER_FILE`, `MAX_UPLOAD_FILES` | Upload limits. |
 | `NEXT_PUBLIC_EXTRA_LANGUAGES` | e.g. `sw:Swahili:sw-KE` |
