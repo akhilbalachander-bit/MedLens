@@ -9,21 +9,21 @@ export function LanguageSelector({ compact = false, className }: { compact?: boo
   return (
     <label
       className={cx(
-        "relative flex items-center gap-2 rounded-xl border bg-white",
+        "relative flex min-w-0 max-w-full items-center gap-2 rounded-xl border bg-white",
         compact ? "border-slate-300 px-2 py-1" : "border-brand-300 px-3 py-2 shadow-sm ring-1 ring-brand-100",
         className,
       )}
     >
       {translationState.status === "loading" ? (
-        <Loader2 className="h-4 w-4 animate-spin text-brand-700" aria-hidden />
+        <Loader2 className="h-4 w-4 shrink-0 animate-spin text-brand-700" aria-hidden />
       ) : (
-        <Languages className={cx("text-brand-700", compact ? "h-4 w-4" : "h-5 w-5")} aria-hidden />
+        <Languages className={cx("shrink-0 text-brand-700", compact ? "h-4 w-4" : "h-5 w-5")} aria-hidden />
       )}
-      <span className={compact ? "sr-only" : "text-sm font-semibold text-ink"}>Language</span>
+      <span className={compact ? "sr-only" : "shrink-0 text-sm font-semibold text-ink"}>Language</span>
       <select
         value={language.code}
         onChange={(e) => setLanguage(e.target.value)}
-        className={cx("cursor-pointer bg-transparent font-medium text-ink focus:outline-none", compact ? "max-w-[9rem] text-sm" : "text-base")}
+        className={cx("min-w-0 cursor-pointer truncate bg-transparent font-medium text-ink focus:outline-none", compact ? "max-w-[9rem] text-sm" : "w-full flex-1 text-base")}
         aria-label="Choose language"
       >
         {languages.map((l) => (
