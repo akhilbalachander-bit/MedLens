@@ -6,7 +6,7 @@ import { errorResponse } from "@/lib/server/uploads";
 import { detectEmergency } from "@/lib/emergency";
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 const Body = z.object({
@@ -38,7 +38,7 @@ Recent conversation:
 ${history.map((h) => `${h.role}: ${h.text}`).join("\n") || "(none)"}
 
 Patient's question: ${question}`;
-    const raw = (await generateJson(cfg, { system: ASSISTANT_SYSTEM, prompt, textOnly: true, temperature: 0.2, timeoutMs: 25_000 })) as {
+    const raw = (await generateJson(cfg, { system: ASSISTANT_SYSTEM, prompt, textOnly: true, temperature: 0.2, timeoutMs: 50_000 })) as {
       answer?: unknown;
       urgent?: unknown;
       sources?: unknown;

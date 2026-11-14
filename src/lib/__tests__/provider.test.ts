@@ -39,3 +39,58 @@ describe("Gemini provider", () => {
     await expect(generateJson(getProviderConfig()!, { system: "s", prompt: "p" })).rejects.toThrow(/Gemini error \(404\)/);
   });
 });
+
+describe("Gemini resilience", () => {
+  const busy = () => new Response(JSON.stringify({ error: { message: "This model is currently experiencing high demand." } }), { status: 503 });
+
+  it("retries a busy model once, then succeeds", async () => {
+    process.env.GEMINI_API_KEY = "k";
+    let n = 0;
+    vi.stubGlobal("fetch", vi.fn(async () => (++n === 1 ? busy() : ok({ fine: true }))));
+    expect(await generateJson(getProviderConfig()!, { system: "s", prompt: "p", timeoutMs: 120_000 })).toEqual({ fine: true });
+    expect(n).toBe(2);
+  });
+
+  it("moves to a lighter model when one stays busy", async () => {
+    process.env.GEMINI_API_KEY = "k";
+    const urls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        urls.push(/models\/([^:]+)/.exec(url)![1]);
+        return url.includes("flash-lite") ? ok({ lite: true }) : busy();
+      }),
+    );
+    expect(await generateJson(getProviderConfig()!, { system: "s", prompt: "p", timeoutMs: 120_000 })).toEqual({ lite: true });
+    expect(urls).toEqual(["gemini-3.8-flash", "gemini-3.8-flash", "gemini-3.8-flash-lite"]);
+    // a busy model is not "retired": the next request starts with the preferred model again
+    expect(getProviderConfig()!.model).toBe("gemini-3.8-flash");
+  });
+
+  it("gives a plain-language message when everything is busy", async () => {
+    process.env.GEMINI_API_KEY = "k";
+    vi.stubGlobal("fetch", vi.fn(async () => busy()));
+    await expect(generateJson(getProviderConfig()!, { system: "s", prompt: "p", timeoutMs: 60_000 })).rejects.toMatchObject({
+      status: 503,
+      message: expect.stringMatching(/very busy/),
+    });
+  });
+
+  it("asks Gemini 3 models to think less, and drops that if a model rejects it", async () => {
+    process.env.GEMINI_API_KEY = "k";
+    const bodies: { generationConfig: { thinkingConfig?: unknown } }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_u: string, init: RequestInit) => {
+        const b = JSON.parse(String(init.body));
+        bodies.push(b);
+        return b.generationConfig.thinkingConfig
+          ? new Response(JSON.stringify({ error: { message: "Unknown field thinkingLevel" } }), { status: 400 })
+          : ok({ ok: 1 });
+      }),
+    );
+    expect(await generateJson(getProviderConfig()!, { system: "s", prompt: "p" })).toEqual({ ok: 1 });
+    expect(bodies[0].generationConfig.thinkingConfig).toEqual({ thinkingLevel: "low" });
+    expect(bodies[1].generationConfig.thinkingConfig).toBeUndefined();
+  });
+});

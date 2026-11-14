@@ -2,7 +2,8 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Sparkles } from "lucide-react";
+import { AlertTriangle, RefreshCcw, Sparkles } from "lucide-react";
+import { useTr } from "@/lib/i18n";
 import { useMedLens } from "@/lib/store";
 import { prepareImage } from "@/lib/image";
 import { sampleResult } from "@/lib/sample/discharge";
@@ -22,6 +23,8 @@ export function ScanFlow({ variant = "hero", initialMode = null }: { variant?: "
   const [error, setError] = useState<ErrorState>(null);
   const [captureKey, setCaptureKey] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
+  const lastFiles = useRef<File[] | null>(null);
+  const tr = useTr();
 
   const finish = (result: AnalysisResult) => {
     setDone(true);
@@ -38,6 +41,7 @@ export function ScanFlow({ variant = "hero", initialMode = null }: { variant?: "
   };
 
   const analyze = async (files: File[]) => {
+    lastFiles.current = files;
     setError(null);
     setBusy(true);
     setDone(false);
@@ -91,16 +95,21 @@ export function ScanFlow({ variant = "hero", initialMode = null }: { variant?: "
       {error && (
         <Notice tone={error.code === "provider_not_configured" ? "info" : "danger"} icon={<AlertTriangle className="h-5 w-5" />}>
           <p className="font-semibold">
-            {error.code === "provider_not_configured" ? "AI analysis is not set up on this server yet" : "We couldn't analyze that document"}
+            {error.code === "provider_not_configured" ? tr("AI analysis is not set up on this server yet") : tr("We couldn't analyze that document")}
           </p>
-          <p className="mt-1">{error.message}</p>
+          <p className="mt-1">{tr(error.message)}</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <button onClick={runSample} className={btn.primary}>
-              <Sparkles className="h-4 w-4" /> Try the sample document
+            {error.code !== "provider_not_configured" && error.code !== "unreadable" && lastFiles.current && (
+              <button onClick={() => void analyze(lastFiles.current!)} className={btn.primary}>
+                <RefreshCcw className="h-4 w-4" /> {tr("Try again")}
+              </button>
+            )}
+            <button onClick={runSample} className={error.code === "provider_not_configured" ? btn.primary : btn.secondary}>
+              <Sparkles className="h-4 w-4" /> {tr("Try the sample document")}
             </button>
             {error.code !== "provider_not_configured" && (
               <button onClick={() => { setError(null); setCaptureKey((k) => k + 1); }} className={btn.secondary}>
-                Scan again
+                {tr("Scan again")}
               </button>
             )}
           </div>

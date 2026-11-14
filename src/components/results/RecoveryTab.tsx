@@ -24,6 +24,7 @@ import { downloadIcs } from "@/lib/ics";
 import { SpeakButton } from "../speech/ListenControls";
 import { Badge, btn, Card, cx, Notice, SectionTitle, Unavailable } from "../ui";
 import { joinSpeech, Localized } from "./shared";
+import { useTr } from "@/lib/i18n";
 
 export function RecoveryTab() {
   return (
@@ -38,6 +39,7 @@ export function RecoveryTab() {
 
 export function EmergencyBanner() {
   const { t } = useMedLens();
+  const tr = useTr();
   return (
     <div role="alert" className="flex flex-col gap-3 rounded-2xl bg-red-700 p-4 text-white shadow-card sm:flex-row sm:items-center">
       <AlertOctagon className="h-8 w-8 shrink-0" aria-hidden />
@@ -45,7 +47,7 @@ export function EmergencyBanner() {
         {t("ui.emergencyBanner")}
       </Localized>
       <a href="tel:911" className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-lg font-bold text-red-700 hover:bg-red-50">
-        <PhoneCall className="h-5 w-5" /> Call 911
+        <PhoneCall className="h-5 w-5" /> {tr("Call 911")}
       </a>
     </div>
   );
@@ -83,14 +85,15 @@ const LIGHTS = [
 
 export function TrafficLight() {
   const { analysis, t } = useMedLens();
+  const tr = useTr();
   const g = analysis!.recovery_guidance;
   const anyItems = g.expected.length + g.contact_provider.length + g.emergency.length > 0;
 
   return (
     <Card>
-      <SectionTitle icon={<Stethoscope className="h-5 w-5" />}>Symptom traffic light</SectionTitle>
+      <SectionTitle icon={<Stethoscope className="h-5 w-5" />}>{tr("Symptom traffic light")}</SectionTitle>
       <p className="mb-3 text-sm text-ink-soft">
-        These come from your discharge paperwork. They are not a diagnosis. If you are unsure, contact your care team — and for an emergency, call 911.
+        {tr("These come from your discharge paperwork. They are not a diagnosis. If you are unsure, contact your care team — and for an emergency, call 911.")}
       </p>
       {(!g.document_has_guidance || !anyItems) && (
         <Notice tone="warning" className="mb-3" icon={<Info className="h-5 w-5" />}>
@@ -102,7 +105,7 @@ export function TrafficLight() {
         {LIGHTS.map((L) => {
           const items = g[L.key];
           const label = t(L.labelKey);
-          const speech = joinSpeech([label, ...(items.length ? items.map((i) => t(`g.${i.id}`, i.text)) : [L.empty])]);
+          const speech = joinSpeech([label, ...(items.length ? items.map((i) => t(`g.${i.id}`, i.text)) : [tr(L.empty)])]);
           return (
             <section key={L.key} className={cx("overflow-hidden rounded-2xl border-2", L.ring)} aria-label={label}>
               <div className={cx("flex items-center justify-between gap-2 px-3 py-2.5", L.head)}>
@@ -114,7 +117,7 @@ export function TrafficLight() {
               </div>
               <div className="p-3">
                 {items.length === 0 ? (
-                  <p className="text-sm italic text-ink-muted">{L.empty}</p>
+                  <p className="text-sm italic text-ink-muted">{tr(L.empty)}</p>
                 ) : (
                   <ul className="space-y-2">
                     {items.map((i) => (
@@ -124,12 +127,12 @@ export function TrafficLight() {
                 )}
                 {L.key === "expected" && items.length > 0 && (
                   <p className="mt-3 text-xs text-ink-muted">
-                    Even expected symptoms can become a problem. If they get worse, last longer than your paperwork says, or worry you, contact your care team.
+                    {tr("Even expected symptoms can become a problem. If they get worse, last longer than your paperwork says, or worry you, contact your care team.")}
                   </p>
                 )}
                 {L.key === "emergency" && (
                   <a href="tel:911" className={cx(btn.danger, "mt-3 w-full")}>
-                    <PhoneCall className="h-4 w-4" /> Call 911
+                    <PhoneCall className="h-4 w-4" /> {tr("Call 911")}
                   </a>
                 )}
               </div>
@@ -143,6 +146,7 @@ export function TrafficLight() {
 
 function GuidanceRow({ item, dot }: { item: GuidanceItem; dot: string }) {
   const { t } = useMedLens();
+  const tr = useTr();
   const [quote, setQuote] = useState(false);
   return (
     <li className="flex gap-2">
@@ -155,7 +159,7 @@ function GuidanceRow({ item, dot }: { item: GuidanceItem; dot: string }) {
           </Badge>
           {item.source_quote && (
             <button onClick={() => setQuote((q) => !q)} className="inline-flex items-center gap-1 text-xs font-medium text-brand-800 underline" aria-expanded={quote}>
-              <Quote className="h-3 w-3" /> {quote ? "Hide" : "Show"} exact words
+              <Quote className="h-3 w-3" /> {tr(quote ? "Hide exact words" : "Show exact words")}
             </button>
           )}
         </div>
@@ -173,6 +177,7 @@ const CK_ICON: Record<string, typeof Bell> = {
 
 export function RecoveryChecklist() {
   const { analysis, t, checklist, toggleChecklist, reminders, addReminder, removeReminder, notify } = useMedLens();
+  const tr = useTr();
   const items = analysis!.recovery_checklist;
   const [editing, setEditing] = useState<string | null>(null);
   const [when, setWhen] = useState("");
@@ -196,7 +201,7 @@ export function RecoveryChecklist() {
     }
     addReminder({ itemId: id, label, at: at.toISOString() });
     setEditing(null);
-    notify(`Reminder set for ${at.toLocaleString()}. Keep MedLens open, or add it to your calendar.`, "success");
+    notify("Reminder set. Keep MedLens open, or add it to your calendar.", "success");
   };
 
   const speech = joinSpeech([t("ui.checklist"), ...items.map((i) => joinSpeech([t(`ck.${i.id}`, i.task), i.timeframe && t(`ck.${i.id}.timeframe`, i.timeframe)]))]);
@@ -207,14 +212,14 @@ export function RecoveryChecklist() {
         <Localized as="span">{t("ui.checklist")}</Localized>
       </SectionTitle>
       {items.length === 0 ? (
-        <Notice tone="info">Your document does not list specific recovery tasks. Ask your care team what you should do in the next few days.</Notice>
+        <Notice tone="info">{tr("Your document does not list specific recovery tasks. Ask your care team what you should do in the next few days.")}</Notice>
       ) : (
         <>
           <div className="mb-3">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-ink-soft">Your first days at home — timelines come from your paperwork.</span>
+              <span className="text-ink-soft">{tr("Your first days at home — timelines come from your paperwork.")}</span>
               <span className="font-semibold text-ink">
-                {done}/{items.length} done
+                {tr("{done}/{total} done", { done, total: items.length })}
               </span>
             </div>
             <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100" aria-hidden>
@@ -249,9 +254,9 @@ export function RecoveryChecklist() {
                             <Localized as="span">{t(`ck.${id}.timeframe`, i.timeframe)}</Localized>
                           </Badge>
                         )}
-                        {i.due_date && <Badge tone="amber">Due {i.due_date}</Badge>}
+                        {i.due_date && <Badge tone="amber">{tr("Due {date}", { date: i.due_date })}</Badge>}
                         {rem && <Badge tone={rem.fired ? "slate" : "green"}>
-                          <Bell className="h-3 w-3" /> {rem.fired ? "Reminded" : new Date(rem.at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
+                          <Bell className="h-3 w-3" /> {rem.fired ? tr("Reminded") : new Date(rem.at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
                         </Badge>}
                       </span>
                     </label>
@@ -260,7 +265,7 @@ export function RecoveryChecklist() {
                     <SpeakButton req={{ id: `ck-speak-${id}`, label, text: joinSpeech([label, i.timeframe && t(`ck.${id}.timeframe`, i.timeframe)]) }} />
                     {rem ? (
                       <button className={btn.ghost} onClick={() => removeReminder(rem.id)}>
-                        <BellOff className="h-4 w-4" /> Remove reminder
+                        <BellOff className="h-4 w-4" /> {tr("Remove reminder")}
                       </button>
                     ) : (
                       <button
@@ -271,18 +276,18 @@ export function RecoveryChecklist() {
                         }}
                         aria-expanded={editing === id}
                       >
-                        <Bell className="h-4 w-4" /> Remind me
+                        <Bell className="h-4 w-4" /> {tr("Remind me")}
                       </button>
                     )}
                   </div>
                   {editing === id && (
                     <div className="mt-2 flex flex-wrap items-end gap-2 rounded-lg bg-slate-50 p-3 sm:ml-9">
                       <label className="text-sm">
-                        <span className="mb-1 block font-medium">Remind me on</span>
+                        <span className="mb-1 block font-medium">{tr("Remind me on")}</span>
                         <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} className="rounded-lg border border-slate-300 px-2 py-1.5" />
                       </label>
-                      <button className={btn.primary} onClick={() => save(id, i.task)}>
-                        Save reminder
+                      <button className={btn.primary} onClick={() => save(id, label)}>
+                        {tr("Save reminder")}
                       </button>
                       <button
                         className={btn.secondary}
@@ -291,10 +296,10 @@ export function RecoveryChecklist() {
                           if (!Number.isNaN(at.getTime())) downloadIcs(`MedLens: ${i.task}`, i.timeframe ? `Timeline from your paperwork: ${i.timeframe}` : "From your MedLens recovery checklist", at);
                         }}
                       >
-                        <CalendarPlus className="h-4 w-4" /> Add to calendar
+                        <CalendarPlus className="h-4 w-4" /> {tr("Add to calendar")}
                       </button>
                       <p className="w-full text-xs text-ink-muted">
-                        In-app reminders work while MedLens is open in this browser. Use “Add to calendar” for a reminder on your phone.
+                        {tr("In-app reminders work while MedLens is open in this browser. Use “Add to calendar” for a reminder on your phone.")}
                       </p>
                     </div>
                   )}
@@ -310,6 +315,7 @@ export function RecoveryChecklist() {
 
 export function FollowUpInfo() {
   const { analysis, t } = useMedLens();
+  const tr = useTr();
   const a = analysis!;
   const na = <Unavailable label={t("ui.notInDoc")} />;
   return (
@@ -319,17 +325,17 @@ export function FollowUpInfo() {
       </SectionTitle>
       {a.follow_up.length === 0 ? (
         <Notice tone="info">
-          No follow-up appointment was found in your document. Call the clinic or hospital that treated you to ask whether you need one.
+          {tr("No follow-up appointment was found in your document. Call the clinic or hospital that treated you to ask whether you need one.")}
         </Notice>
       ) : (
         <ul className="grid gap-3 md:grid-cols-2">
           {a.follow_up.map((f) => (
             <li key={f.id} className="rounded-xl border border-slate-200 p-3">
-              <p className="text-lg font-semibold text-ink">{f.provider_name ?? f.clinic_name ?? "Follow-up visit"}</p>
+              <p className="text-lg font-semibold text-ink">{f.provider_name ?? f.clinic_name ?? tr("Follow-up visit")}</p>
               <dl className="mt-2 space-y-1.5 text-[15px]">
-                <Row label="Specialty">{f.specialty ?? na}</Row>
-                <Row label="Clinic">{f.clinic_name ?? na}</Row>
-                <Row label="Phone">
+                <Row label={tr("Specialty")}>{f.specialty ?? na}</Row>
+                <Row label={tr("Clinic")}>{f.clinic_name ?? na}</Row>
+                <Row label={tr("Phone")}>
                   {f.phone ? (
                     <a href={`tel:${f.phone.replace(/[^\d+]/g, "")}`} className="font-semibold text-brand-800 underline">
                       {f.phone}
@@ -338,19 +344,19 @@ export function FollowUpInfo() {
                     na
                   )}
                 </Row>
-                <Row label="Address">{f.address ?? na}</Row>
-                <Row label="Appointment">
-                  {f.appointment_date || f.appointment_time ? `${f.appointment_date ?? ""} ${f.appointment_time ?? ""}`.trim() : <span>Not scheduled in your document</span>}
+                <Row label={tr("Address")}>{f.address ?? na}</Row>
+                <Row label={tr("Appointment")}>
+                  {f.appointment_date || f.appointment_time ? `${f.appointment_date ?? ""} ${f.appointment_time ?? ""}`.trim() : <span>{tr("Not scheduled in your document")}</span>}
                 </Row>
-                <Row label="When">{f.timeframe ? <Localized as="span">{t(`fu.${f.id}.timeframe`, f.timeframe)}</Localized> : na}</Row>
-                <Row label="Why">{f.reason ? <Localized as="span">{t(`fu.${f.id}.reason`, f.reason)}</Localized> : na}</Row>
+                <Row label={tr("When")}>{f.timeframe ? <Localized as="span">{t(`fu.${f.id}.timeframe`, f.timeframe)}</Localized> : na}</Row>
+                <Row label={tr("Why")}>{f.reason ? <Localized as="span">{t(`fu.${f.id}.reason`, f.reason)}</Localized> : na}</Row>
               </dl>
               <div className="mt-2">
                 <SpeakButton
                   req={{
                     id: `fu-${f.id}`,
                     label: t("ui.followUp"),
-                    text: joinSpeech([f.provider_name, f.clinic_name, f.phone && `Phone ${f.phone}`, f.timeframe && t(`fu.${f.id}.timeframe`, f.timeframe), f.reason && t(`fu.${f.id}.reason`, f.reason)]),
+                    text: joinSpeech([f.provider_name, f.clinic_name, f.phone && `${tr("Phone")} ${f.phone}`, f.timeframe && t(`fu.${f.id}.timeframe`, f.timeframe), f.reason && t(`fu.${f.id}.reason`, f.reason)]),
                   }}
                 />
               </div>
@@ -363,7 +369,7 @@ export function FollowUpInfo() {
         <FlaskConical className="h-4 w-4 text-brand-700" /> <Localized as="span">{t("ui.tests")}</Localized>
       </h3>
       {a.ordered_tests.length === 0 ? (
-        <p className="text-sm text-ink-muted">No lab tests or imaging orders were found in your document.</p>
+        <p className="text-sm text-ink-muted">{tr("No lab tests or imaging orders were found in your document.")}</p>
       ) : (
         <ul className="space-y-2">
           {a.ordered_tests.map((ts) => (
@@ -371,15 +377,15 @@ export function FollowUpInfo() {
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-semibold text-ink">{ts.name}</span>
                 <Badge tone={ts.type === "lab" ? "blue" : ts.type === "imaging" ? "brand" : "slate"}>
-                  {ts.type === "lab" ? "Lab test" : ts.type === "imaging" ? "Imaging" : "Test"}
+                  {tr(ts.type === "lab" ? "Lab test" : ts.type === "imaging" ? "Imaging" : "Test")}
                 </Badge>
               </div>
               {ts.simple_explanation && <Localized as="p" className="mt-1 text-ink">{t(`ts.${ts.id}.explain`, ts.simple_explanation)}</Localized>}
               <dl className="mt-1.5 space-y-1 text-sm">
-                <Row label="When">{ts.timing ? <Localized as="span">{t(`ts.${ts.id}.timing`, ts.timing)}</Localized> : na}</Row>
-                <Row label="Where">{ts.location ?? na}</Row>
+                <Row label={tr("When")}>{ts.timing ? <Localized as="span">{t(`ts.${ts.id}.timing`, ts.timing)}</Localized> : na}</Row>
+                <Row label={tr("Where")}>{ts.location ?? na}</Row>
                 {ts.instructions && (
-                  <Row label="Prep">
+                  <Row label={tr("Prep")}>
                     <Localized as="span">{t(`ts.${ts.id}.instructions`, ts.instructions)}</Localized>
                   </Row>
                 )}

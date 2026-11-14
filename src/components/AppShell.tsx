@@ -17,6 +17,7 @@ import {
   Info,
 } from "lucide-react";
 import { useMedLens } from "@/lib/store";
+import { useTr } from "@/lib/i18n";
 import { LanguageSelector } from "./LanguageSelector";
 import { cx } from "./ui";
 
@@ -46,12 +47,13 @@ function Logo() {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { analysis, hydrated } = useMedLens();
+  const tr = useTr();
   const active = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
 
   return (
     <div className="min-h-screen">
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:p-2">
-        Skip to content
+        {tr("Skip to content")}
       </a>
 
       {/* Desktop sidebar */}
@@ -69,7 +71,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               )}
             >
               <n.icon className="h-5 w-5" aria-hidden />
-              {n.label}
+              {tr(n.label)}
             </Link>
           ))}
           {hydrated && analysis && (
@@ -82,12 +84,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               )}
             >
               <LayoutDashboard className="h-5 w-5" aria-hidden />
-              My results
+              {tr("My results")}
             </Link>
           )}
         </nav>
         <p className="mt-auto text-xs leading-relaxed text-ink-muted">
-          MedLens explains your paperwork in plain language. It is not a doctor and does not give medical advice. In an emergency call 911.
+          {tr("MedLens explains your paperwork in plain language. It is not a doctor and does not give medical advice. In an emergency call 911.")}
         </p>
       </aside>
 
@@ -97,11 +99,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="lg:hidden">
             <Logo />
           </div>
-          <div className="hidden text-sm text-ink-muted lg:block">Scan → Understand → Listen → Act</div>
+          <div className="hidden text-sm text-ink-muted lg:block">{tr("Scan → Understand → Listen → Act")}</div>
           <div className="flex items-center gap-2">
             {hydrated && analysis && (
               <Link href="/results" className="hidden rounded-lg px-2 py-1 text-sm font-semibold text-brand-800 hover:bg-brand-50 sm:block lg:hidden">
-                My results
+                {tr("My results")}
               </Link>
             )}
             <LanguageSelector compact />
@@ -127,7 +129,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 )}
               >
                 <n.icon className="h-5 w-5" aria-hidden />
-                {n.short}
+                {tr(n.short)}
               </Link>
             </li>
           ))}
@@ -142,6 +144,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
 function Toasts() {
   const { toasts, dismissToast } = useMedLens();
+  const tr = useTr();
   return (
     <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-20 z-50 flex flex-col items-center gap-2 px-4 lg:bottom-6">
       {toasts.map((t) => (
@@ -153,8 +156,8 @@ function Toasts() {
           )}
         >
           {t.tone === "success" ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : t.tone === "warning" ? <AlertTriangle className="h-4 w-4 shrink-0" /> : <Info className="h-4 w-4 shrink-0" />}
-          <span className="flex-1">{t.message}</span>
-          <button onClick={() => dismissToast(t.id)} aria-label="Dismiss" className="opacity-80 hover:opacity-100">
+          <span className="flex-1">{t.translated ? t.message : tr(t.message)}</span>
+          <button onClick={() => dismissToast(t.id)} aria-label={tr("Dismiss")} className="opacity-80 hover:opacity-100">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -166,16 +169,17 @@ function Toasts() {
 /** Fires in-app (and, if permitted, system) notifications for checklist reminders while MedLens is open. */
 function ReminderWatcher() {
   const { reminders, markReminderFired, notify } = useMedLens();
+  const tr = useTr();
   useEffect(() => {
     const check = () => {
       const now = Date.now();
       for (const r of reminders) {
         if (!r.fired && new Date(r.at).getTime() <= now) {
           markReminderFired(r.id);
-          notify(`Reminder: ${r.label}`, "info");
+          notify(`${tr("Reminder")}: ${r.label}`, "info", true);
           try {
             if ("Notification" in window && Notification.permission === "granted") {
-              new Notification("MedLens reminder", { body: r.label });
+              new Notification(tr("MedLens reminder"), { body: r.label });
             }
           } catch {
             /* ignore */
@@ -186,6 +190,6 @@ function ReminderWatcher() {
     check();
     const id = setInterval(check, 15_000);
     return () => clearInterval(id);
-  }, [reminders, markReminderFired, notify]);
+  }, [reminders, markReminderFired, notify, tr]);
   return null;
 }

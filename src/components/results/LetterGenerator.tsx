@@ -6,6 +6,7 @@ import { useMedLens } from "@/lib/store";
 import { buildLetter, EMPTY_FIELDS, LETTER_TYPES, type LetterFields, type LetterType } from "@/lib/letters";
 import { downloadText } from "@/lib/ics";
 import { btn, Card, cx, SectionTitle } from "../ui";
+import { useTr } from "@/lib/i18n";
 
 const FIELD_DEFS: { key: keyof LetterFields; label: string; placeholder?: string; wide?: boolean; area?: boolean }[] = [
   { key: "patientName", label: "Your name" },
@@ -24,7 +25,8 @@ const FIELD_DEFS: { key: keyof LetterFields; label: string; placeholder?: string
 ];
 
 export function LetterGenerator() {
-  const { analysis, bill, notify } = useMedLens();
+  const { analysis, bill, notify, language } = useMedLens();
+  const tr = useTr();
   const [type, setType] = useState<LetterType>("itemized");
   const [fields, setFields] = useState<LetterFields>(EMPTY_FIELDS);
   const [text, setText] = useState("");
@@ -71,40 +73,41 @@ export function LetterGenerator() {
 
   return (
     <Card id="letters">
-      <SectionTitle icon={<FileSignature className="h-5 w-5" />}>Financial assistance letters</SectionTitle>
+      <SectionTitle icon={<FileSignature className="h-5 w-5" />}>{tr("Financial assistance letters")}</SectionTitle>
       <p className="mb-3 text-ink-soft">
-        Make a letter to send to the hospital billing office. Fill in what you know, edit the text, then copy, download or print it.
+        {tr("Make a letter to send to the hospital billing office. Fill in what you know, edit the text, then copy, download or print it.")}
+        {language.code !== "en" && <> {tr("The letter itself is in English because it goes to a U.S. hospital billing office.")}</>}
       </p>
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4" role="radiogroup" aria-label="Letter type">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4" role="radiogroup" aria-label={tr("Letter type")}>
         {LETTER_TYPES.map((l) => (
           <button
             key={l.id}
             role="radio"
             aria-checked={type === l.id}
             onClick={() => {
-              if (edited && !confirm("Switch letter type? Your edits to this letter will be replaced.")) return;
+              if (edited && !confirm(tr("Switch letter type? Your edits to this letter will be replaced."))) return;
               setEdited(false);
               setType(l.id);
             }}
             className={cx("rounded-xl border p-3 text-left", type === l.id ? "border-brand-500 bg-brand-50 ring-1 ring-brand-500" : "border-slate-200 hover:border-brand-300")}
           >
-            <span className="block font-semibold text-ink">{l.title}</span>
-            <span className="block text-xs text-ink-soft">{l.description}</span>
+            <span className="block font-semibold text-ink">{tr(l.title)}</span>
+            <span className="block text-xs text-ink-soft">{tr(l.description)}</span>
           </button>
         ))}
       </div>
 
       <details className="mt-4 rounded-xl border border-slate-200 p-3" open>
-        <summary className="cursor-pointer font-semibold text-ink">Your details</summary>
+        <summary className="cursor-pointer font-semibold text-ink">{tr("Your details")}</summary>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           {FIELD_DEFS.map((d) => (
             <label key={d.key} className={cx("text-sm", d.wide && "sm:col-span-2")}>
-              <span className="mb-1 block font-medium text-ink-soft">{d.label}</span>
+              <span className="mb-1 block font-medium text-ink-soft">{tr(d.label)}</span>
               {d.area ? (
                 <textarea
                   rows={2}
                   value={fields[d.key]}
-                  placeholder={d.placeholder}
+                  placeholder={d.placeholder && tr(d.placeholder)}
                   onChange={(e) => {
                     setEdited(false);
                     setFields({ ...fields, [d.key]: e.target.value });
@@ -114,7 +117,7 @@ export function LetterGenerator() {
               ) : (
                 <input
                   value={fields[d.key]}
-                  placeholder={d.placeholder}
+                  placeholder={d.placeholder && tr(d.placeholder)}
                   onChange={(e) => {
                     setEdited(false);
                     setFields({ ...fields, [d.key]: e.target.value });
@@ -125,12 +128,12 @@ export function LetterGenerator() {
             </label>
           ))}
         </div>
-        <p className="mt-2 text-xs text-ink-muted">Changing a detail rebuilds the letter (and replaces manual edits).</p>
+        <p className="mt-2 text-xs text-ink-muted">{tr("Changing a detail rebuilds the letter (and replaces manual edits).")}</p>
       </details>
 
       <label className="mt-4 block">
         <span className="mb-1 flex items-center justify-between text-sm font-semibold text-ink">
-          Letter text {edited && <span className="font-normal text-ink-muted">(edited)</span>}
+          {tr("Letter text")} {edited && <span className="font-normal text-ink-muted">({tr("edited")})</span>}
         </span>
         <textarea
           value={text}
@@ -139,18 +142,19 @@ export function LetterGenerator() {
             setEdited(true);
           }}
           rows={18}
+          lang="en"
           className="w-full rounded-xl border border-slate-300 p-3 font-mono text-sm leading-relaxed"
         />
       </label>
       <div className="mt-3 flex flex-wrap gap-2">
         <button onClick={copy} className={btn.primary}>
-          <Copy className="h-4 w-4" /> Copy letter
+          <Copy className="h-4 w-4" /> {tr("Copy letter")}
         </button>
         <button onClick={() => downloadText(`medlens-${type}-letter.txt`, text)} className={btn.secondary}>
-          <Download className="h-4 w-4" /> Download
+          <Download className="h-4 w-4" /> {tr("Download")}
         </button>
         <button onClick={print} className={btn.secondary}>
-          <Printer className="h-4 w-4" /> Print
+          <Printer className="h-4 w-4" /> {tr("Print")}
         </button>
         {edited && (
           <button
@@ -160,14 +164,13 @@ export function LetterGenerator() {
             }}
             className={btn.ghost}
           >
-            <RefreshCw className="h-4 w-4" /> Reset to template
+            <RefreshCw className="h-4 w-4" /> {tr("Reset to template")}
           </button>
         )}
       </div>
       <p className="mt-3 flex items-start gap-2 text-xs text-ink-muted">
         <ShieldCheck className="h-4 w-4 shrink-0 text-brand-700" />
-        MedLens never sends letters for you. Review the letter, keep a copy, and send it yourself by mail, email or the hospital&apos;s patient portal.
-        This is not legal advice.
+        {tr("MedLens never sends letters for you. Review the letter, keep a copy, and send it yourself by mail, email or the hospital's patient portal. This is not legal advice.")}
       </p>
     </Card>
   );

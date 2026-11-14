@@ -7,6 +7,7 @@ import { AlertTriangle, BookOpen, FileText, HeartPulse, Mic, ScanLine, Wallet, X
 import { useMedLens } from "@/lib/store";
 import { LanguageSelector, TranslationStatus } from "../LanguageSelector";
 import { Badge, btn, cx, Notice } from "../ui";
+import { useTr } from "@/lib/i18n";
 import { NoAnalysis } from "./shared";
 import { UnderstandTab } from "./UnderstandTab";
 import { RecoveryTab } from "./RecoveryTab";
@@ -32,7 +33,8 @@ const DOC_TYPE: Record<string, string> = {
 };
 
 export function ResultsDashboard() {
-  const { analysis, hydrated } = useMedLens();
+  const { analysis, hydrated, t } = useMedLens();
+  const tr = useTr();
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -60,28 +62,29 @@ export function ResultsDashboard() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <Badge tone="brand">{DOC_TYPE[analysis.document_type] ?? "Medical document"}</Badge>
-              {analysis.meta.source === "sample" && <Badge tone="amber">Fictional sample</Badge>}
-              {analysis.meta.source === "mock" && <Badge tone="amber">Mock AI — fictional data</Badge>}
-              {analysis.meta.source === "ai" && analysis.meta.model && <Badge>Read by {analysis.meta.model}</Badge>}
-              {analysis.extraction_status === "partial" && <Badge tone="amber">Partly readable</Badge>}
+              <Badge tone="brand">{tr(DOC_TYPE[analysis.document_type] ?? "Medical document")}</Badge>
+              {analysis.meta.source === "sample" && <Badge tone="amber">{tr("Fictional sample")}</Badge>}
+              {analysis.meta.source === "mock" && <Badge tone="amber">{tr("Mock AI — fictional data")}</Badge>}
+              {analysis.meta.source === "ai" && analysis.meta.model && <Badge>{tr("Read by AI")}</Badge>}
+              {analysis.extraction_status === "partial" && <Badge tone="amber">{tr("Partly readable")}</Badge>}
             </div>
-            <h1 className="mt-2 text-2xl font-bold text-ink">{analysis.facility_name ?? "Your document"}</h1>
+            <h1 className="mt-2 text-2xl font-bold text-ink">{analysis.facility_name ?? tr("Your document")}</h1>
             <p className="text-sm text-ink-muted">
-              {date ? `Visit: ${date}` : "Visit date not listed"} · {analysis.meta.page_count} page{analysis.meta.page_count === 1 ? "" : "s"}
+              {date ? tr("Visit: {date}", { date }) : tr("Visit date not listed")} ·{" "}
+              {analysis.meta.page_count === 1 ? tr("1 page") : tr("{count} pages", { count: analysis.meta.page_count })}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             {analysis.meta.source !== "ai" && (
               <button onClick={() => setShowDoc(true)} className={btn.secondary}>
-                <FileText className="h-4 w-4" /> View document
+                <FileText className="h-4 w-4" /> {tr("View document")}
               </button>
             )}
             <Link href="/scan" className={btn.secondary}>
-              <ScanLine className="h-4 w-4" /> Scan another
+              <ScanLine className="h-4 w-4" /> {tr("Scan another")}
             </Link>
             <Link href="/assistant" className={btn.secondary}>
-              <Mic className="h-4 w-4" /> Ask a question
+              <Mic className="h-4 w-4" /> {tr("Ask a question")}
             </Link>
           </div>
         </div>
@@ -96,12 +99,16 @@ export function ResultsDashboard() {
 
         {analysis.verification_required && analysis.uncertain_fields.length > 0 && (
           <Notice tone="warning" icon={<AlertTriangle className="h-5 w-5" />}>
-            <p className="font-semibold">Please double-check {analysis.uncertain_fields.length === 1 ? "this item" : "these items"} with your pharmacist or doctor</p>
+            <p className="font-semibold">
+              {analysis.uncertain_fields.length === 1
+                ? tr("Please double-check this item with your pharmacist or doctor")
+                : tr("Please double-check these items with your pharmacist or doctor")}
+            </p>
             <ul className="mt-1 list-disc space-y-0.5 pl-5">
               {analysis.uncertain_fields.map((u, i) => (
                 <li key={i}>
                   <span className="font-medium">{u.field}</span>
-                  {u.reason ? ` — ${u.reason}` : ""}
+                  {u.reason ? ` — ${t(`uf.${i}.reason`, u.reason)}` : ""}
                 </li>
               ))}
             </ul>
@@ -109,7 +116,7 @@ export function ResultsDashboard() {
         )}
       </header>
 
-      <div role="tablist" aria-label="Results" className="sticky top-14 z-10 -mx-4 grid grid-cols-3 gap-1 border-b border-slate-200 bg-slate-50/95 px-4 pt-1 backdrop-blur">
+      <div role="tablist" aria-label={tr("Results")} className="sticky top-14 z-10 -mx-4 grid grid-cols-3 gap-1 border-b border-slate-200 bg-slate-50/95 px-4 pt-1 backdrop-blur">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -124,8 +131,8 @@ export function ResultsDashboard() {
             )}
           >
             <t.icon className="h-5 w-5" aria-hidden />
-            <span className="sm:hidden">{t.short}</span>
-            <span className="hidden sm:inline">{t.label}</span>
+            <span className="sm:hidden">{tr(t.short)}</span>
+            <span className="hidden sm:inline">{tr(t.label)}</span>
           </button>
         ))}
       </div>
@@ -137,9 +144,9 @@ export function ResultsDashboard() {
       </div>
 
       {showDoc && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4" role="dialog" aria-modal="true" aria-label="Sample document">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4" role="dialog" aria-modal="true" aria-label={tr("Sample document")}>
           <div className="relative w-full max-w-2xl">
-            <button onClick={() => setShowDoc(false)} className="absolute -top-2 right-0 rounded-full bg-white p-2 shadow" aria-label="Close document">
+            <button onClick={() => setShowDoc(false)} className="absolute -top-2 right-0 rounded-full bg-white p-2 shadow" aria-label={tr("Close document")}>
               <X className="h-5 w-5" />
             </button>
             <div className="mt-8">

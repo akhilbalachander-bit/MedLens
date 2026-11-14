@@ -6,7 +6,7 @@ import { errorResponse, readUploads } from "@/lib/server/uploads";
 import { sampleResult } from "@/lib/sample/discharge";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
 /**
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
       system: ANALYSIS_SYSTEM,
       prompt: analysisPrompt(files.length),
       files,
-      timeoutMs: 55_000,
+      timeoutMs: 270_000,
     });
     const parsed = AnalysisSchema.safeParse(raw);
     if (!parsed.success) {

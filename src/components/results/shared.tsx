@@ -1,5 +1,6 @@
 "use client";
 
+import { useTr } from "@/lib/i18n";
 import Link from "next/link";
 import { ScanLine } from "lucide-react";
 import { useMedLens } from "@/lib/store";
@@ -17,6 +18,7 @@ export function Localized({ children, className, as: Tag = "div" }: { children: 
 }
 
 export function NoAnalysis({ title = "No document scanned yet" }: { title?: string }) {
+  const tr = useTr();
   return (
     <Card className="space-y-4">
       <div className="flex items-start gap-3">
@@ -24,15 +26,15 @@ export function NoAnalysis({ title = "No document scanned yet" }: { title?: stri
           <ScanLine className="h-6 w-6" />
         </span>
         <div>
-          <h1 className="text-xl font-bold text-ink">{title}</h1>
+          <h1 className="text-xl font-bold text-ink">{tr(title)}</h1>
           <p className="text-ink-soft">
-            Scan or upload your discharge papers or a medication label to see this page, or try the fictional sample document.
+            {tr("Scan or upload your discharge papers or a medication label to see this page, or try the fictional sample document.")}
           </p>
         </div>
       </div>
       <ScanFlow variant="compact" />
       <p className="text-sm text-ink-muted">
-        Or go to <Link className="font-medium text-brand-800 underline" href="/scan">Scan Documents</Link>.
+        {tr("Or go to")} <Link className="font-medium text-brand-800 underline" href="/scan">{tr("Scan Documents")}</Link>.
       </p>
     </Card>
   );

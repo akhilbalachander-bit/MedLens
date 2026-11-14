@@ -53,8 +53,13 @@ Rules:
 - If the bill is a summary (not itemized), set is_itemized false and say the patient can request an itemized bill.
 - Output JSON only.`;
 
-export function billPrompt(pageCount: number) {
-  return `The bill has ${pageCount} page(s)/file(s), in order. Return JSON with exactly this shape:
+export function billPrompt(pageCount: number, languageName = "English") {
+  const lang =
+    languageName === "English"
+      ? ""
+      : `\nWrite plain_summary, every plain_explanation, every terminology explanation and every reason in ${languageName}, in simple words. Keep line-item descriptions, codes, billing terms, names, dates and amounts exactly as printed on the bill.`;
+  return `The bill has ${pageCount} page(s)/file(s), in order.${lang}
+Return JSON with exactly this shape:
 ${BILL_JSON_SHAPE}`;
 }
 
@@ -64,6 +69,7 @@ Rules:
 - Keep the exact medical meaning. Do not add, remove, soften or strengthen anything (especially warnings and emergency instructions).
 - Keep medication names exactly as written in Latin letters (e.g. "Ondansetron", "Ibuprofen 600 mg"). You may add a transliteration in parentheses after the name for non-Latin scripts.
 - Keep all numbers, doses, units, times, dates, phone numbers and "911" exactly the same.
+- Keep placeholders in curly braces, such as {name} or {count}, exactly as they are.
 - Return a JSON object with exactly the same keys as the input and the translated strings as values. Output JSON only.`;
 
 export function translatePrompt(languageName: string, protectedTerms: string[], entries: Record<string, string>) {
