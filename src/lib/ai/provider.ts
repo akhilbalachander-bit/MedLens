@@ -34,6 +34,13 @@ export class AIError extends Error {
   }
 }
 
+/**
+ * Gemini models tried in order when Google reports one as not found or
+ * retired (404). The first one that works is remembered.
+ */
+export const GEMINI_MODELS = ["gemini-3.8-flash", "gemini-3.8-flash-lite", "gemini-2.5-flash"];
+let workingGeminiModel: string | null = null;
+
 export function getProviderConfig(): ProviderConfig | null {
   const env = process.env;
   const requested = (env.AI_PROVIDER ?? "").trim().toLowerCase();
@@ -51,7 +58,7 @@ export function getProviderConfig(): ProviderConfig | null {
 
   if (pick === "mock") return { provider: "mock", model: "mock", textModel: "mock", apiKey: null, baseUrl: null };
   if (pick === "gemini" && gemini) {
-    const model = env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+    const model = env.GEMINI_MODEL?.trim() || workingGeminiModel || GEMINI_MODELS[0];
     return { provider: "gemini", model, textModel: env.GEMINI_TEXT_MODEL?.trim() || model, apiKey: gemini, baseUrl: null };
   }
   if (pick === "openai" && openai) {
@@ -132,19 +139,27 @@ export async function generateJson(cfg: ProviderConfig, opts: GenerateOptions): 
 
 async function callGemini(cfg: ProviderConfig, opts: GenerateOptions, signal: AbortSignal) {
   const model = opts.textOnly ? cfg.textModel : cfg.model;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   const parts: unknown[] = (opts.files ?? []).map((f) => ({ inline_data: { mime_type: f.mimeType, data: f.base64 } }));
   parts.push({ text: opts.prompt });
-  const res = await fetch(url, {
-    method: "POST",
-    signal,
-    headers: { "Content-Type": "application/json", "x-goog-api-key": cfg.apiKey! },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: opts.system }] },
-      contents: [{ role: "user", parts }],
-      generationConfig: { responseMimeType: "application/json", temperature: opts.temperature ?? 0.1 },
-    }),
+  const payload = JSON.stringify({
+    systemInstruction: { parts: [{ text: opts.system }] },
+    contents: [{ role: "user", parts }],
+    generationConfig: { responseMimeType: "application/json", temperature: opts.temperature ?? 0.1 },
   });
+  const call = (m: string) =>
+    fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`, {
+      method: "POST",
+      signal,
+      headers: { "Content-Type": "application/json", "x-goog-api-key": cfg.apiKey! },
+      body: payload,
+    });
+  const models = [model, ...GEMINI_MODELS.filter((m) => m !== model)];
+  let res = await call(models[0]);
+  for (let i = 1; i < models.length && res.status === 404; i++) {
+    console.warn(`Gemini model ${models[i - 1]} unavailable (404); trying ${models[i]}`);
+    res = await call(models[i]);
+    if (res.ok) workingGeminiModel = models[i];
+  }
   const body = await res.json().catch(() => null);
   if (!res.ok) {
     const msg = body?.error?.message ?? res.statusText;
