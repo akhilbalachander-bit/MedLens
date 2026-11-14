@@ -6,6 +6,7 @@ import { useMedLens } from "@/lib/store";
 import { prepareImage } from "@/lib/image";
 import { findPossibleDuplicates, type BillAnalysisResult, type BillLineItem } from "@/lib/bill-schema";
 import { sampleBillResult } from "@/lib/sample/bill";
+import { billKey } from "@/lib/translatable";
 import { SpeakButton } from "../speech/ListenControls";
 import { Badge, btn, Card, cx, Notice, SectionTitle } from "../ui";
 import { DocumentCapture } from "../scan/DocumentCapture";
@@ -29,7 +30,7 @@ const money = (n: number | null | undefined) =>
   n == null ? "—" : n.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: n % 1 ? 2 : 0 });
 
 export function BillAuditor() {
-  const { bill, setBill, notify, language } = useMedLens();
+  const { bill, setBill, notify } = useMedLens();
   const tr = useTr();
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -51,7 +52,6 @@ export function BillAuditor() {
       const prepared = await Promise.all(files.map((f) => prepareImage(f)));
       const form = new FormData();
       prepared.forEach((f) => form.append("files", f, f.name));
-      form.append("language", language.name);
       const res = await fetch("/api/bill", { method: "POST", body: form });
       const body = await res.json().catch(() => null);
       if (!res.ok) throw Object.assign(new Error(body?.error?.message ?? "Bill analysis failed."), { code: body?.error?.code });
@@ -116,8 +116,9 @@ export function BillAuditor() {
 function BillReport({ bill }: { bill: BillAnalysisResult }) {
   const [view, setView] = useState<"category" | "list">("category");
   const tr = useTr();
-  // A real bill is written in the patient's language by the AI; the built-in sample is English and translated here.
-  const c = (s: string | null | undefined) => (s && bill.meta.source !== "ai" ? tr(s) : (s ?? ""));
+  const { t } = useMedLens();
+  // Bill text is translated with the document, so it follows every language change.
+  const c = (s: string | null | undefined) => (s ? t(billKey(s), s) : "");
   const items = bill.line_items;
   const byId = useMemo(() => new Map(items.map((i) => [i.id!, i])), [items]);
 
@@ -168,7 +169,7 @@ function BillReport({ bill }: { bill: BillAnalysisResult }) {
         <Stat label={tr("Amount due")} value={money(bill.amount_due)} strong />
       </div>
       <p className="text-sm text-ink-muted">
-        {bill.facility_name ?? tr("Facility not listed")} · {tr("Account")} {bill.patient_account_number ?? tr("not listed")} · {tr("Service")}{" "}
+        {bill.facility_name ? c(bill.facility_name) : tr("Facility not listed")} · {tr("Account")} {bill.patient_account_number ?? tr("not listed")} · {tr("Service")}{" "}
         {bill.service_dates ?? tr("date not listed")}
         {bill.due_date ? ` · ${tr("Due {date}", { date: bill.due_date })}` : ""}
       </p>
@@ -212,7 +213,7 @@ function BillReport({ bill }: { bill: BillAnalysisResult }) {
                 <ul className="mt-1 text-ink">
                   {d.item_ids.map((id) => (
                     <li key={id}>
-                      • {byId.get(id)?.description} {byId.get(id)?.code ? `(${byId.get(id)?.code})` : ""} — {money(byId.get(id)?.amount)}
+                      • {c(byId.get(id)?.description)} {byId.get(id)?.code ? `(${byId.get(id)?.code})` : ""} — {money(byId.get(id)?.amount)}
                     </li>
                   ))}
                 </ul>
@@ -223,7 +224,7 @@ function BillReport({ bill }: { bill: BillAnalysisResult }) {
               return (
                 <li key={`c${i}`} className="rounded-lg bg-white p-2.5 text-sm">
                   <p className="flex items-center gap-1.5 font-semibold text-ink">
-                    <HelpCircle className="h-4 w-4 text-amber-700" /> {li ? `${li.description} — ${money(li.amount)}` : tr("Question to ask")}
+                    <HelpCircle className="h-4 w-4 text-amber-700" /> {li ? `${c(li.description)} — ${money(li.amount)}` : tr("Question to ask")}
                   </p>
                   <p className="text-ink-soft">{c(q.reason)}</p>
                 </li>
@@ -280,7 +281,7 @@ function BillReport({ bill }: { bill: BillAnalysisResult }) {
           <dl className="grid gap-2 sm:grid-cols-2">
             {bill.terminology.map((t) => (
               <div key={t.term} className="rounded-xl bg-slate-50 p-3">
-                <dt className="font-semibold text-ink">{t.term}</dt>
+                <dt className="font-semibold text-ink">{c(t.term)}</dt>
                 <dd className="text-sm text-ink-soft">{c(t.explanation)}</dd>
               </div>
             ))}
@@ -301,7 +302,7 @@ function LineTable({ items, flagged, c }: { items: BillLineItem[]; flagged: Map<
       {items.map((li) => (
         <li key={li.id} className={cx("grid grid-cols-[1fr_auto] gap-2 p-3", flagged.has(li.id!) && "bg-amber-50/60")}>
           <div className="min-w-0">
-            <p className="font-medium text-ink">{li.description}</p>
+            <p className="font-medium text-ink">{c(li.description)}</p>
             <p className="text-xs text-ink-muted">
               {[li.service_date, li.code && `${tr("Code")} ${li.code}`, li.quantity != null && li.quantity !== 1 && `${tr("Qty")} ${li.quantity}`]
                 .filter(Boolean)

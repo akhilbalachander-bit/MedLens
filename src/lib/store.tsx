@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { AnalysisResult } from "./schema";
 import type { BillAnalysisResult } from "./bill-schema";
 import { BUILT_IN_LANGUAGES, ENV_LANGUAGES, mergeLanguages, type Language } from "./languages";
-import { buildTranslatable, protectedTerms, UI_LABELS } from "./translatable";
+import { buildBillTranslatable, buildTranslatable, protectedTerms, UI_LABELS } from "./translatable";
 import { SAMPLE_TRANSLATIONS } from "./sample/discharge-es";
 
 /**
@@ -156,8 +156,12 @@ export function MedLensProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const english = useMemo(
-    () => (session.analysis ? buildTranslatable(session.analysis) : { ...UI_LABELS }) as Record<string, string>,
-    [session.analysis],
+    () =>
+      ({
+        ...(session.analysis ? buildTranslatable(session.analysis) : { ...UI_LABELS }),
+        ...(session.bill ? buildBillTranslatable(session.bill) : {}),
+      }) as Record<string, string>,
+    [session.analysis, session.bill],
   );
 
   // ---------- translation (cached per language for this session) ----------
@@ -175,6 +179,7 @@ export function MedLensProvider({ children }: { children: React.ReactNode }) {
       // Offline sample translations (work without any API key).
       const offline = analysis && analysis.meta.source !== "ai" ? SAMPLE_TRANSLATIONS[lang.code] : undefined;
       const uiOnlyOffline = !analysis ? SAMPLE_TRANSLATIONS[lang.code] : undefined;
+      const offlineCovered = new Set(Object.keys(offline ?? uiOnlyOffline ?? {}));
       if (offline || uiOnlyOffline) {
         const src = (offline ?? uiOnlyOffline)!;
         const subset = Object.fromEntries(Object.keys(english).filter((k) => k in src).map((k) => [k, src[k]]));
@@ -202,7 +207,7 @@ export function MedLensProvider({ children }: { children: React.ReactNode }) {
       inflight.current.add(key);
       setTxState((s) => ({ ...s, [lang.code]: { status: "loading" } }));
       try {
-        const todo = force ? Object.keys(english) : missingKeys;
+        const todo = (force ? Object.keys(english) : missingKeys).filter((k) => !offlineCovered.has(k));
         const prot = analysis ? protectedTerms(analysis) : [];
         let errorMessage: string | null = null;
         const sendBatch = async (keys: string[]): Promise<string[]> => {

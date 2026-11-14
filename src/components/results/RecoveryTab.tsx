@@ -23,7 +23,7 @@ import type { GuidanceItem } from "@/lib/schema";
 import { downloadIcs } from "@/lib/ics";
 import { SpeakButton } from "../speech/ListenControls";
 import { Badge, btn, Card, cx, Notice, SectionTitle, Unavailable } from "../ui";
-import { joinSpeech, Localized } from "./shared";
+import { joinSpeech, Localized, OriginalText } from "./shared";
 import { useTr } from "@/lib/i18n";
 
 export function RecoveryTab() {
@@ -163,7 +163,12 @@ function GuidanceRow({ item, dot }: { item: GuidanceItem; dot: string }) {
             </button>
           )}
         </div>
-        {quote && item.source_quote && <p className="mt-1 rounded bg-slate-50 p-2 font-mono text-xs text-ink-soft">“{item.source_quote}”</p>}
+        {quote && item.source_quote && (
+          <div className="mt-1 rounded bg-slate-50 p-2 text-xs text-ink-soft">
+            <Localized as="p">“{t(`g.${item.id}.quote`, item.source_quote)}”</Localized>
+            <OriginalText text={item.source_quote} />
+          </div>
+        )}
       </div>
     </li>
   );
@@ -293,7 +298,13 @@ export function RecoveryChecklist() {
                         className={btn.secondary}
                         onClick={() => {
                           const at = new Date(when);
-                          if (!Number.isNaN(at.getTime())) downloadIcs(`MedLens: ${i.task}`, i.timeframe ? `Timeline from your paperwork: ${i.timeframe}` : "From your MedLens recovery checklist", at);
+                          if (!Number.isNaN(at.getTime())) downloadIcs(
+                              `MedLens: ${label}`,
+                              i.timeframe
+                                ? tr("Timeline from your paperwork: {time}", { time: t(`ck.${id}.timeframe`, i.timeframe) })
+                                : tr("From your MedLens recovery checklist"),
+                              at,
+                            );
                         }}
                       >
                         <CalendarPlus className="h-4 w-4" /> {tr("Add to calendar")}
@@ -331,10 +342,12 @@ export function FollowUpInfo() {
         <ul className="grid gap-3 md:grid-cols-2">
           {a.follow_up.map((f) => (
             <li key={f.id} className="rounded-xl border border-slate-200 p-3">
-              <p className="text-lg font-semibold text-ink">{f.provider_name ?? f.clinic_name ?? tr("Follow-up visit")}</p>
+              <Localized as="p" className="text-lg font-semibold text-ink">
+                {f.provider_name ? t(`fu.${f.id}.provider`, f.provider_name) : f.clinic_name ? t(`fu.${f.id}.clinic`, f.clinic_name) : tr("Follow-up visit")}
+              </Localized>
               <dl className="mt-2 space-y-1.5 text-[15px]">
-                <Row label={tr("Specialty")}>{f.specialty ?? na}</Row>
-                <Row label={tr("Clinic")}>{f.clinic_name ?? na}</Row>
+                <Row label={tr("Specialty")}>{f.specialty ? <Localized as="span">{t(`fu.${f.id}.specialty`, f.specialty)}</Localized> : na}</Row>
+                <Row label={tr("Clinic")}>{f.clinic_name ? <Localized as="span">{t(`fu.${f.id}.clinic`, f.clinic_name)}</Localized> : na}</Row>
                 <Row label={tr("Phone")}>
                   {f.phone ? (
                     <a href={`tel:${f.phone.replace(/[^\d+]/g, "")}`} className="font-semibold text-brand-800 underline">
@@ -356,7 +369,10 @@ export function FollowUpInfo() {
                   req={{
                     id: `fu-${f.id}`,
                     label: t("ui.followUp"),
-                    text: joinSpeech([f.provider_name, f.clinic_name, f.phone && `${tr("Phone")} ${f.phone}`, f.timeframe && t(`fu.${f.id}.timeframe`, f.timeframe), f.reason && t(`fu.${f.id}.reason`, f.reason)]),
+                    text: joinSpeech([
+                      f.provider_name && t(`fu.${f.id}.provider`, f.provider_name),
+                      f.clinic_name && t(`fu.${f.id}.clinic`, f.clinic_name),
+                      f.phone && `${tr("Phone")} ${f.phone}`, f.timeframe && t(`fu.${f.id}.timeframe`, f.timeframe), f.reason && t(`fu.${f.id}.reason`, f.reason)]),
                   }}
                 />
               </div>
@@ -375,7 +391,7 @@ export function FollowUpInfo() {
           {a.ordered_tests.map((ts) => (
             <li key={ts.id} className="rounded-xl bg-slate-50 p-3">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-semibold text-ink">{ts.name}</span>
+                <Localized as="span" className="font-semibold text-ink">{t(`ts.${ts.id}.name`, ts.name)}</Localized>
                 <Badge tone={ts.type === "lab" ? "blue" : ts.type === "imaging" ? "brand" : "slate"}>
                   {tr(ts.type === "lab" ? "Lab test" : ts.type === "imaging" ? "Imaging" : "Test")}
                 </Badge>
@@ -383,7 +399,7 @@ export function FollowUpInfo() {
               {ts.simple_explanation && <Localized as="p" className="mt-1 text-ink">{t(`ts.${ts.id}.explain`, ts.simple_explanation)}</Localized>}
               <dl className="mt-1.5 space-y-1 text-sm">
                 <Row label={tr("When")}>{ts.timing ? <Localized as="span">{t(`ts.${ts.id}.timing`, ts.timing)}</Localized> : na}</Row>
-                <Row label={tr("Where")}>{ts.location ?? na}</Row>
+                <Row label={tr("Where")}>{ts.location ? <Localized as="span">{t(`ts.${ts.id}.location`, ts.location)}</Localized> : na}</Row>
                 {ts.instructions && (
                   <Row label={tr("Prep")}>
                     <Localized as="span">{t(`ts.${ts.id}.instructions`, ts.instructions)}</Localized>

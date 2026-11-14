@@ -8,7 +8,7 @@ import { useMedLens } from "@/lib/store";
 import type { Medication } from "@/lib/schema";
 import { SpeakButton } from "@/components/speech/ListenControls";
 import { Badge, btn, Card, cx, Notice, SectionTitle, Unavailable } from "@/components/ui";
-import { joinSpeech, Localized } from "@/components/results/shared";
+import { joinSpeech, Localized, OriginalText } from "@/components/results/shared";
 import { ScanFlow } from "@/components/scan/ScanFlow";
 import { TranslationStatus } from "@/components/LanguageSelector";
 
@@ -112,13 +112,14 @@ export default function MedicationsPage() {
 }
 
 function MedCard({ m }: { m: Medication }) {
-  const { t, medVerified, setMedVerified } = useMedLens();
+  const { t, medVerified, setMedVerified, language } = useMedLens();
   const tr = useTr();
   const verified = !!medVerified[m.id!];
   const na = <Unavailable label={t("ui.notInDoc")} />;
   const simple = t(`med.${m.id}.simple`, m.instructions_simple);
   const purpose = t(`med.${m.id}.purpose`, m.purpose);
-  const speech = joinSpeech([`${m.name} ${m.strength ?? ""}`, purpose, simple, ...m.warnings.map((w, i) => t(`med.${m.id}.warn.${i}`, w))]);
+  const name = t(`med.${m.id}.name`, m.name);
+  const speech = joinSpeech([`${name} ${m.strength ?? ""}`, purpose, simple, ...m.warnings.map((w, i) => t(`med.${m.id}.warn.${i}`, w))]);
   const st = STATUS[m.status];
   return (
     <li>
@@ -126,16 +127,16 @@ function MedCard({ m }: { m: Medication }) {
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h2 className="text-xl font-bold text-ink">
-              {m.name} {m.strength && <span className="font-semibold text-ink-soft">{m.strength}</span>}
+              <Localized as="span">{name}</Localized> {m.strength && <span className="font-semibold text-ink-soft">{m.strength}</span>}
             </h2>
             <div className="mt-1 flex flex-wrap gap-2">
               {st && <Badge tone={st.tone}>{tr(st.label)}</Badge>}
-              {m.brand_name && m.brand_name !== m.name && <Badge>{tr("Brand:")} {m.brand_name}</Badge>}
-              {m.generic_name && m.generic_name.toLowerCase() !== m.name.toLowerCase() && <Badge>{tr("Generic:")} {m.generic_name}</Badge>}
+              {m.brand_name && m.brand_name !== m.name && <Badge>{tr("Brand:")} {t(`med.${m.id}.brand`, m.brand_name)}</Badge>}
+              {m.generic_name && m.generic_name.toLowerCase() !== m.name.toLowerCase() && <Badge>{tr("Generic:")} {t(`med.${m.id}.generic`, m.generic_name)}</Badge>}
               <Badge tone={m.confidence === "high" ? "green" : m.confidence === "low" ? "red" : "amber"}>{tr(m.confidence === "high" ? "Read confidence: high" : m.confidence === "low" ? "Read confidence: low" : "Read confidence: medium")}</Badge>
             </div>
           </div>
-          <SpeakButton req={{ id: `medcard-${m.id}`, label: m.name, text: speech }} />
+          <SpeakButton req={{ id: `medcard-${m.id}`, label: name, text: speech }} />
         </div>
 
         {m.needs_verification && (
@@ -177,10 +178,13 @@ function MedCard({ m }: { m: Medication }) {
           ))}
         </dl>
         {m.instructions_original && (
-          <p className="mt-3 text-sm text-ink-soft">
-            <span className="font-medium">{t("ui.docSays")}: </span>
-            <span className="font-mono">{m.instructions_original}</span>
-          </p>
+          <div className="mt-3 text-sm text-ink-soft">
+            <Localized as="p">
+              <span className="font-medium">{t("ui.docSays")}: </span>
+              <span className={language.code === "en" ? "font-mono" : undefined}>{t(`med.${m.id}.orig`, m.instructions_original)}</span>
+            </Localized>
+            {language.code !== "en" && <OriginalText text={`${m.name}${m.strength ? ` ${m.strength}` : ""}: ${m.instructions_original}`} />}
+          </div>
         )}
         {m.warnings.length > 0 && (
           <ul className="mt-3 space-y-1">

@@ -68,7 +68,7 @@ export function ResultsDashboard() {
               {analysis.meta.source === "ai" && analysis.meta.model && <Badge>{tr("Read by AI")}</Badge>}
               {analysis.extraction_status === "partial" && <Badge tone="amber">{tr("Partly readable")}</Badge>}
             </div>
-            <h1 className="mt-2 text-2xl font-bold text-ink">{analysis.facility_name ?? tr("Your document")}</h1>
+            <h1 className="mt-2 text-2xl font-bold text-ink">{analysis.facility_name ? t("facility", analysis.facility_name) : tr("Your document")}</h1>
             <p className="text-sm text-ink-muted">
               {date ? tr("Visit: {date}", { date }) : tr("Visit date not listed")} ·{" "}
               {analysis.meta.page_count === 1 ? tr("1 page") : tr("{count} pages", { count: analysis.meta.page_count })}
@@ -107,7 +107,7 @@ export function ResultsDashboard() {
             <ul className="mt-1 list-disc space-y-0.5 pl-5">
               {analysis.uncertain_fields.map((u, i) => (
                 <li key={i}>
-                  <span className="font-medium">{u.field}</span>
+                  <span className="font-medium">{t(`uf.${i}.field`, u.field)}</span>
                   {u.reason ? ` — ${t(`uf.${i}.reason`, u.reason)}` : ""}
                 </li>
               ))}

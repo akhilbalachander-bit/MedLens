@@ -31,6 +31,8 @@ export function LetterGenerator() {
   const [fields, setFields] = useState<LetterFields>(EMPTY_FIELDS);
   const [text, setText] = useState("");
   const [edited, setEdited] = useState(false);
+  const [letterLang, setLetterLang] = useState<"mine" | "en">("mine");
+  const inEnglish = letterLang === "en" || language.code === "en";
 
   // Prefill from the scanned document / bill (only values actually found).
   useEffect(() => {
@@ -48,7 +50,10 @@ export function LetterGenerator() {
     }));
   }, [analysis, bill]);
 
-  const generated = useMemo(() => buildLetter(type, fields), [type, fields]);
+  const generated = useMemo(
+    () => (inEnglish ? buildLetter(type, fields) : buildLetter(type, fields, new Date(), tr, language.speech)),
+    [type, fields, inEnglish, tr, language.speech],
+  );
   useEffect(() => {
     if (!edited) setText(generated.body);
   }, [generated, edited]);
@@ -76,7 +81,6 @@ export function LetterGenerator() {
       <SectionTitle icon={<FileSignature className="h-5 w-5" />}>{tr("Financial assistance letters")}</SectionTitle>
       <p className="mb-3 text-ink-soft">
         {tr("Make a letter to send to the hospital billing office. Fill in what you know, edit the text, then copy, download or print it.")}
-        {language.code !== "en" && <> {tr("The letter itself is in English because it goes to a U.S. hospital billing office.")}</>}
       </p>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4" role="radiogroup" aria-label={tr("Letter type")}>
         {LETTER_TYPES.map((l) => (
@@ -131,6 +135,32 @@ export function LetterGenerator() {
         <p className="mt-2 text-xs text-ink-muted">{tr("Changing a detail rebuilds the letter (and replaces manual edits).")}</p>
       </details>
 
+      {language.code !== "en" && (
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <span className="text-sm font-semibold text-ink">{tr("Letter language")}</span>
+          <div className="inline-flex overflow-hidden rounded-xl border border-slate-300 text-sm" role="group" aria-label={tr("Letter language")}>
+            {([
+              ["mine", language.native],
+              ["en", "English"],
+            ] as const).map(([v, label]) => (
+              <button
+                key={v}
+                onClick={() => {
+                  if (edited && !confirm(tr("Switch letter language? Your edits to this letter will be replaced."))) return;
+                  setEdited(false);
+                  setLetterLang(v);
+                }}
+                aria-pressed={letterLang === v}
+                className={cx("px-3 py-1.5 font-medium", letterLang === v ? "bg-brand-700 text-white" : "hover:bg-slate-50")}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <span className="w-full text-xs text-ink-muted">{tr("Most U.S. hospital billing offices read English. You can switch the letter to English before you send it.")}</span>
+        </div>
+      )}
+
       <label className="mt-4 block">
         <span className="mb-1 flex items-center justify-between text-sm font-semibold text-ink">
           {tr("Letter text")} {edited && <span className="font-normal text-ink-muted">({tr("edited")})</span>}
@@ -142,7 +172,8 @@ export function LetterGenerator() {
             setEdited(true);
           }}
           rows={18}
-          lang="en"
+          lang={inEnglish ? "en" : language.code}
+          dir={!inEnglish && language.rtl ? "rtl" : undefined}
           className="w-full rounded-xl border border-slate-300 p-3 font-mono text-sm leading-relaxed"
         />
       </label>
