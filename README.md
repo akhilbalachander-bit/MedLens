@@ -67,6 +67,15 @@ See `.env.example`. Key variables:
 
 `AI_PROVIDER=mock` is for development: every upload returns the fictional sample, and the UI labels it as mock data.
 
+## Testing
+
+```bash
+npm test          # unit tests (Vitest)
+npm run typecheck
+```
+
+The tests in `src/lib/__tests__` pin down the safety rules above: emergency-keyword screening (including phone-keyboard apostrophes such as `can’t`), schema leniency and *Not listed* nulls, medication verification flags, bill duplicate detection, and the offline assistant never offering "expected" symptoms for an urgent question. CI runs typecheck, tests and a production build on every push.
+
 ## Deployment
 
 Vercel-compatible (`npm run build`). Photos are downscaled in the browser before upload to stay under serverless request-body limits. Large multi-page PDFs may still exceed Vercel's ~4.5 MB limit; split them or upload page photos instead.
