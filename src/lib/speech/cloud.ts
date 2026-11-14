@@ -7,15 +7,19 @@ export function ttsLocale(lang: Language): string {
 }
 
 /**
- * Group sentences into fewer, larger requests. The first group stays short so
- * audio starts quickly; later ones are fetched while earlier ones play.
+ * Group sentences into voice requests that grow: the first is short so audio
+ * starts quickly, and each later one is larger than the one before, so it is
+ * ready (fetched while the earlier ones play) before it is needed. A short
+ * heading never stands alone: it would play in a second and leave a gap.
  */
-export function packChunks(sentences: string[], first = 220, rest = 1200): string[] {
+export const CHUNK_LIMITS = [200, 350, 600, 900, 1200];
+const MIN_CHUNK = 90;
+export function packChunks(sentences: string[], limits: number[] = CHUNK_LIMITS): string[] {
   const out: string[] = [];
   let cur = "";
   for (const s of sentences) {
-    const limit = out.length === 0 ? first : rest;
-    if (cur && (cur + " " + s).length > limit) {
+    const limit = limits[Math.min(out.length, limits.length - 1)];
+    if (cur && cur.length >= MIN_CHUNK && (cur + " " + s).length > limit) {
       out.push(cur);
       cur = s;
     } else cur = cur ? `${cur} ${s}` : s;
@@ -63,6 +67,11 @@ export class CloudSpeechEngine implements SpeechEngine {
   private cache = new Map<string, Promise<string>>();
   private failedLocales = new Map<string, number>();
   private usingFallback = false;
+  private paused = false;
+  /** Set when the next piece arrived while paused: playing it is what Resume does. */
+  private resumePending: (() => void) | null = null;
+  /** Pieces requested ahead of playback (current + this many). */
+  static readonly LOOKAHEAD = 2;
 
   constructor(private fallback: SpeechEngine) {}
 
@@ -145,24 +154,16 @@ export class CloudSpeechEngine implements SpeechEngine {
     audio.play().catch(() => {});
 
     let started = false;
-    const playAt = async (i: number) => {
-      if (my !== this.token) return;
-      if (i >= chunks.length) {
-        opts.onEnd?.();
-        return;
+    // Request ahead so the next piece is ready before the current one ends.
+    const prefetch = (from: number) => {
+      for (let j = from; j < Math.min(chunks.length, from + CloudSpeechEngine.LOOKAHEAD); j++) {
+        void this.fetchChunk(chunks[j], opts.lang).catch(() => {});
       }
-      let url: string;
-      try {
-        url = await this.fetchChunk(chunks[i], opts.lang);
-      } catch (e) {
-        if (my !== this.token) return;
-        const status = (e as { status?: number }).status;
-        if (status === 400) this.failedLocales.set(locale, Date.now());
-        this.handOff(chunks.slice(i).join(" "), opts, (e as Error).message, started);
-        return;
-      }
+    };
+    prefetch(0);
+
+    const start = async (i: number, url: string) => {
       if (my !== this.token) return;
-      if (i + 1 < chunks.length) void this.fetchChunk(chunks[i + 1], opts.lang).catch(() => {});
       audio.src = url;
       audio.playbackRate = opts.rate;
       audio.onended = () => void playAt(i + 1);
@@ -182,6 +183,32 @@ export class CloudSpeechEngine implements SpeechEngine {
         opts.onStart?.();
       }
     };
+
+    const playAt = async (i: number) => {
+      if (my !== this.token) return;
+      if (i >= chunks.length) {
+        opts.onEnd?.();
+        return;
+      }
+      prefetch(i + 1);
+      let url: string;
+      try {
+        url = await this.fetchChunk(chunks[i], opts.lang);
+      } catch (e) {
+        if (my !== this.token) return;
+        const status = (e as { status?: number }).status;
+        if (status === 400) this.failedLocales.set(locale, Date.now());
+        this.handOff(chunks.slice(i).join(" "), opts, (e as Error).message, started);
+        return;
+      }
+      if (my !== this.token) return;
+      // Paused while this piece was loading: wait for Resume instead of playing.
+      if (this.paused) {
+        this.resumePending = () => void start(i, url);
+        return;
+      }
+      await start(i, url);
+    };
     void playAt(0);
   }
 
@@ -199,15 +226,22 @@ export class CloudSpeechEngine implements SpeechEngine {
   }
 
   pause() {
+    this.paused = true;
     if (this.usingFallback) this.fallback.pause();
     else this.audio?.pause();
   }
   resume() {
-    if (this.usingFallback) this.fallback.resume();
+    this.paused = false;
+    if (this.usingFallback) return this.fallback.resume();
+    const pending = this.resumePending;
+    this.resumePending = null;
+    if (pending) pending();
     else void this.audio?.play().catch(() => {});
   }
   cancel() {
     this.token++;
+    this.paused = false;
+    this.resumePending = null;
     if (this.usingFallback) this.fallback.cancel();
     this.usingFallback = false;
     if (this.audio) {
