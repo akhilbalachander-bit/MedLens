@@ -175,3 +175,18 @@ describe("Gemini voice resilience", () => {
     await expect(synthesize(getTtsConfig()!, "hi unique-d", "en-US", "English")).rejects.toMatchObject({ status: 503 });
   });
 });
+
+describe("packChunks pacing (no silence after the title)", async () => {
+  const { packChunks } = await import("../speech/cloud");
+  it("never leaves a short heading alone as the first piece", () => {
+    const long = "You went to the emergency room because you had been throwing up and had diarrhea for two days, and you felt faint and fell on your left arm.";
+    const out = packChunks(["What happened?", long, "More text here."]);
+    expect(out[0].startsWith("What happened? You went")).toBe(true);
+  });
+  it("makes each piece larger than the one before, so the next is ready in time", () => {
+    const sentences = Array.from({ length: 150 }, (_, i) => `This is sentence number ${i} of the instructions.`);
+    const out = packChunks(sentences);
+    for (let i = 1; i < Math.min(out.length - 1, 4); i++) expect(out[i].length).toBeGreaterThan(out[i - 1].length);
+    expect(out[1].length).toBeLessThanOrEqual(350);
+  });
+});
