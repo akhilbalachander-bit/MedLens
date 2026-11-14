@@ -9,7 +9,7 @@ export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 const Body = z.object({
-  text: z.string().trim().min(1).max(1500),
+  text: z.string().trim().min(1).max(3000),
   locale: z.string().regex(/^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*$/),
   languageName: z.string().min(2).max(60),
 });

@@ -64,3 +64,19 @@ Optional: **Settings → Domains** to use your own domain.
 - **Settings → Read aloud → Test voice** in a few languages.
 - **Settings → AI document reader** should say *Connected*.
 - Scan a real prescription label with **Scan with Camera**.
+
+## 5. Troubleshooting
+
+Open `https://<your-site>/api/config?check=1`. It makes one tiny test request
+and never shows your key.
+
+- `check.ok: false`: document reading is failing. The `error` says why, and
+  `availableModels` lists the models your key can use.
+- `voiceCheck.ok: false`: the natural voice is failing. The error says why.
+  A "busy" or 429 error usually means Gemini's free tier has run out of voice
+  requests (its limits for voices are low). Turn on billing for the key's
+  project, or add a `GOOGLE_TTS_API_KEY` (Google Cloud Text-to-Speech has a
+  generous free monthly allowance).
+- Voices sound robotic: that is the device's own voice, used only when the
+  natural voice fails *and* the device has a voice for that language. Fix the
+  voice check above.

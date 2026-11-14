@@ -125,7 +125,7 @@ export default function SettingsPage() {
               </select>
             </label>
             )}
-            <button className={btn.secondary} onClick={() => speech.speak({ id: "test", label: tr("Voice test"), text: TEST_PHRASE[language.code] ?? TEST_PHRASE.en })}>
+            <button className={btn.secondary} onClick={() => speech.speak({ id: "test", label: tr("Voice test"), lang: language, text: TEST_PHRASE[language.code] ?? TEST_PHRASE.en })}>
               <Volume2 className="h-4 w-4" /> {tr("Test voice")}
             </button>
             {speech.status === "loading" && <p className="text-sm text-brand-800">{tr("Preparing voice…")}</p>}

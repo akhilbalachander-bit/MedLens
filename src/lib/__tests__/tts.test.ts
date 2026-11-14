@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getTtsConfig, pcmToWav, synthesize } from "../tts/server";
+import { getTtsConfig, pcmToWav, resetTtsState, synthesize } from "../tts/server";
 
 const KEYS = ["TTS_PROVIDER", "GOOGLE_TTS_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY", "GOOGLE_TTS_VOICE"];
 let saved: Record<string, string | undefined>;
@@ -10,6 +10,7 @@ beforeEach(() => {
 afterEach(() => {
   for (const k of KEYS) (saved[k] === undefined ? delete process.env[k] : (process.env[k] = saved[k]));
   vi.unstubAllGlobals();
+  resetTtsState();
 });
 
 describe("getTtsConfig", () => {
@@ -102,31 +103,75 @@ describe("synthesize", () => {
 describe("packChunks", async () => {
   const { packChunks } = await import("../speech/cloud");
   it("keeps the first chunk short and packs the rest, without losing text", () => {
-    const sentences = Array.from({ length: 30 }, (_, i) => `Sentence number ${i} is here.`);
+    const sentences = Array.from({ length: 120 }, (_, i) => `Sentence number ${i} is here.`);
     const out = packChunks(sentences);
-    expect(out[0].length).toBeLessThanOrEqual(160);
+    expect(out[0].length).toBeLessThanOrEqual(220);
     expect(out.length).toBeLessThan(10);
-    for (const c of out.slice(1)) expect(c.length).toBeLessThanOrEqual(600);
+    for (const c of out.slice(1)) expect(c.length).toBeLessThanOrEqual(1200);
     expect(out.join(" ")).toBe(sentences.join(" "));
   });
 });
 
-describe("Gemini model fallback", () => {
-  it("tries the next model when one is not found", async () => {
-    process.env.GEMINI_API_KEY = "g";
-    const urls: string[] = [];
+describe("Gemini voice resilience", () => {
+  const audio = () => Response.json({ candidates: [{ content: { parts: [{ inlineData: { mimeType: "audio/L16;rate=24000", data: "AAAA" } }] } }] });
+  const err = (status: number, message: string) => new Response(JSON.stringify({ error: { message } }), { status });
+  function fake(gen: (model: string, body: Record<string, any>) => Response, listed: string[] = []) {
+    const calls: string[] = [];
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (url: string) => {
-        urls.push(url);
-        if (!url.includes("2.5")) return new Response(JSON.stringify({ error: { message: "not found" } }), { status: 404 });
-        return Response.json({ candidates: [{ content: { parts: [{ inlineData: { mimeType: "audio/L16;rate=24000", data: "AAAA" } }] } }] });
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (/\/models\?/.test(url)) {
+          calls.push("LIST");
+          return Response.json({ models: listed.map((m) => ({ name: `models/${m}` })) });
+        }
+        const m = /models\/([^:]+):/.exec(url)![1];
+        calls.push(m);
+        return gen(m, JSON.parse(String(init?.body)));
       }),
     );
-    const cfg = getTtsConfig()!;
-    const out = await synthesize(cfg, "fallback unique-5", "en-US", "English");
+    return calls;
+  }
+
+  it("uses a warm voice and a natural speaking style by default", async () => {
+    process.env.GEMINI_API_KEY = "g";
+    let body: Record<string, any> = {};
+    fake((_m, b) => ((body = b), audio()));
+    await synthesize(getTtsConfig()!, "Xin chào", "vi-VN", "Vietnamese");
+    expect(body.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName).toBe("Sulafat");
+    expect(body.contents[0].parts[0].text).toMatch(/Vietnamese.*warm.*natural.*: Xin chào$/);
+  });
+
+  it("finds the voice model this key has when the built-in names are not found", async () => {
+    process.env.GEMINI_API_KEY = "g";
+    const calls = fake((m) => (m === "gemini-4.0-flash-tts" ? audio() : err(404, "not found")), ["gemini-2.5-flash-preview-tts", "gemini-4.0-flash-tts", "gemini-4.0-flash"]);
+    const out = await synthesize(getTtsConfig()!, "hi unique-a", "en-US", "English");
     expect(out.mimeType).toBe("audio/wav");
-    expect(urls.map((u) => /models\/([^:]+)/.exec(u)?.[1])).toEqual(["gemini-3.8-flash-tts", "gemini-3.8-flash-lite-tts", "gemini-2.5-flash-preview-tts"]);
-    expect(cfg.model).toBe("gemini-2.5-flash-preview-tts");
+    expect(calls).toEqual(["gemini-3.8-flash-tts", "LIST", "gemini-3.8-flash-lite-tts", "gemini-4.0-flash-tts"]);
+    expect(getTtsConfig()!.model).toBe("gemini-4.0-flash-tts");
+  });
+
+  it("falls back to the default voice if the voice name is rejected", async () => {
+    process.env.GEMINI_API_KEY = "g";
+    const voices: unknown[] = [];
+    fake((_m, b) => {
+      voices.push(b.generationConfig.speechConfig);
+      return b.generationConfig.speechConfig ? err(400, "Unknown voice name") : audio();
+    });
+    await synthesize(getTtsConfig()!, "hi unique-b", "en-US", "English");
+    expect(voices).toHaveLength(2);
+    expect(voices[1]).toBeUndefined();
+  });
+
+  it("retries when busy, then tries the lighter model", async () => {
+    process.env.GEMINI_API_KEY = "g";
+    const calls = fake((m) => (m.includes("lite") ? audio() : err(503, "high demand")));
+    await synthesize(getTtsConfig()!, "hi unique-c", "en-US", "English");
+    expect(calls).toEqual(["gemini-3.8-flash-tts", "gemini-3.8-flash-tts", "gemini-3.8-flash-lite-tts"]);
+  });
+
+  it("says 'busy' (503) when every voice model is busy", async () => {
+    process.env.GEMINI_API_KEY = "g";
+    fake(() => err(503, "high demand"));
+    await expect(synthesize(getTtsConfig()!, "hi unique-d", "en-US", "English")).rejects.toMatchObject({ status: 503 });
   });
 });

@@ -99,6 +99,14 @@ export class BrowserSpeechEngine implements SpeechEngine {
     const my = ++this.token;
     const chunks = chunkText(text);
     const native = synth.getVoices();
+    // Voices are loaded but none speaks this language: the browser would use
+    // its default (usually English) voice, which is unintelligible. Say so.
+    if (native.length > 0 && voicesForLanguage(this.getVoices(), opts.lang).length === 0) {
+      opts.onError?.(
+        "This device has no voice for this language. Turn on “Natural online voice” in Settings, or add the language in your device's speech settings.",
+      );
+      return;
+    }
     const voice =
       (opts.voiceId && native.find((v) => v.voiceURI === opts.voiceId)) ||
       native.find((v) => v.voiceURI === voicesForLanguage(this.getVoices(), opts.lang)[0]?.id) ||

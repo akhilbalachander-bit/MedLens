@@ -37,7 +37,7 @@ type SpeechCtx = {
 const Ctx = createContext<SpeechCtx | null>(null);
 
 export function SpeechProvider({ children }: { children: React.ReactNode }) {
-  const { language, prefs, setPrefs, provider } = useMedLens();
+  const { language, prefs, setPrefs, provider, translationState } = useMedLens();
   const deviceRef = useRef<BrowserSpeechEngine | null>(null);
   const cloudRef = useRef<CloudSpeechEngine | null>(null);
   const engineRef = useRef<SpeechEngine | null>(null);
@@ -96,6 +96,14 @@ export function SpeechProvider({ children }: { children: React.ReactNode }) {
         setError("Read-aloud is not supported in this browser. Try Chrome, Edge or Safari.");
         return;
       }
+      // Text built from the page is English until the new translation arrives;
+      // reading it now would play English. (Requests that carry their own
+      // `lang` are already in that language.)
+      if (!req.lang && language.code !== "en" && translationState.status === "loading") {
+        setError(null);
+        setNotice("Still translating into your language. Tap Listen again in a few seconds.");
+        return;
+      }
       const lang = req.lang ?? language;
       const voiceId = lang.code === language.code ? selectedVoiceId : null;
       setError(null);
@@ -120,7 +128,7 @@ export function SpeechProvider({ children }: { children: React.ReactNode }) {
         },
       });
     },
-    [language, selectedVoiceId, prefs.speechRate],
+    [language, selectedVoiceId, prefs.speechRate, translationState.status],
   );
 
   const pause = useCallback(() => {
