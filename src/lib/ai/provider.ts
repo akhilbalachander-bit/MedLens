@@ -117,56 +117,124 @@ type GenerateOptions = {
 
 export async function generateJson(cfg: ProviderConfig, opts: GenerateOptions): Promise<unknown> {
   const controller = new AbortController();
+  const deadline = Date.now() + (opts.timeoutMs ?? 55_000);
   const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? 55_000);
   try {
-    const text =
-      cfg.provider === "gemini"
-        ? await callGemini(cfg, opts, controller.signal)
-        : cfg.provider === "openai"
-          ? await callOpenAI(cfg, opts, controller.signal)
-          : (() => {
-              throw new AIError("provider_error", "Mock provider has no generic generation.");
-            })();
-    return extractJson(text);
+    for (let attempt = 0; ; attempt++) {
+      const text =
+        cfg.provider === "gemini"
+          ? await callGemini(cfg, opts, controller.signal, deadline)
+          : cfg.provider === "openai"
+            ? await callOpenAI(cfg, opts, controller.signal)
+            : (() => {
+                throw new AIError("provider_error", "Mock provider has no generic generation.");
+              })();
+      try {
+        return extractJson(text);
+      } catch (e) {
+        // A cut-off or malformed reply: ask once more if there is time.
+        if (attempt >= 1 || deadline - Date.now() < 15_000) throw e;
+      }
+    }
   } catch (e) {
     if (e instanceof AIError) throw e;
-    if ((e as Error)?.name === "AbortError") throw new AIError("timeout", "The AI model took too long to respond.", 504);
+    if ((e as Error)?.name === "AbortError") throw new AIError("timeout", "The AI model took too long to respond. Please try again.", 504);
     throw new AIError("provider_error", `Could not reach the AI provider: ${(e as Error).message}`);
   } finally {
     clearTimeout(timer);
   }
 }
 
-async function callGemini(cfg: ProviderConfig, opts: GenerateOptions, signal: AbortSignal) {
+const sleep = (ms: number, signal: AbortSignal) =>
+  new Promise<void>((resolve, reject) => {
+    const t = setTimeout(resolve, ms);
+    signal.addEventListener("abort", () => {
+      clearTimeout(t);
+      reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+    });
+  });
+
+/** Gemini 3 models think before answering; "low" is much faster and plenty for extraction. */
+let thinkingUnsupported = false;
+const thinkingConfig = (model: string) =>
+  thinkingUnsupported ? undefined : /gemini-[3-9]/.test(model) ? { thinkingLevel: "low" } : /2\.5-flash/.test(model) ? { thinkingBudget: 0 } : undefined;
+
+/** Overloaded (503), rate-limited (429) or server error: worth retrying or switching model. */
+const transient = (status: number) => status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+
+async function callGemini(cfg: ProviderConfig, opts: GenerateOptions, signal: AbortSignal, deadline: number) {
   const model = opts.textOnly ? cfg.textModel : cfg.model;
   const parts: unknown[] = (opts.files ?? []).map((f) => ({ inline_data: { mime_type: f.mimeType, data: f.base64 } }));
   parts.push({ text: opts.prompt });
-  const payload = JSON.stringify({
-    systemInstruction: { parts: [{ text: opts.system }] },
-    contents: [{ role: "user", parts }],
-    generationConfig: { responseMimeType: "application/json", temperature: opts.temperature ?? 0.1 },
-  });
   const call = (m: string) =>
     fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`, {
       method: "POST",
       signal,
       headers: { "Content-Type": "application/json", "x-goog-api-key": cfg.apiKey! },
-      body: payload,
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: opts.system }] },
+        contents: [{ role: "user", parts }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          temperature: opts.temperature ?? 0.1,
+          ...(thinkingConfig(m) ? { thinkingConfig: thinkingConfig(m) } : {}),
+        },
+      }),
     });
+
+  // Try the chosen model, then the others. A retired model (404) is skipped
+  // at once; an overloaded one gets one quick retry before moving on.
   const models = [model, ...GEMINI_MODELS.filter((m) => m !== model)];
-  let res = await call(models[0]);
-  for (let i = 1; i < models.length && res.status === 404; i++) {
-    console.warn(`Gemini model ${models[i - 1]} unavailable (404); trying ${models[i]}`);
-    res = await call(models[i]);
-    if (res.ok) workingGeminiModel = models[i];
+  let res: Response | null = null;
+  let onlyRetiredSkipped = true;
+  for (let i = 0; i < models.length; i++) {
+    const m = models[i];
+    for (let attempt = 0; attempt < 2; attempt++) {
+      res = await call(m);
+      if (res.status === 400 && !thinkingUnsupported && thinkingConfig(m)) {
+        const text = await res.clone().text();
+        if (/thinking/i.test(text)) {
+          thinkingUnsupported = true;
+          res = await call(m);
+        }
+      }
+      if (!transient(res.status)) break;
+      const wait = 1500 * (attempt + 1);
+      if (attempt === 0 && deadline - Date.now() > wait + 20_000) {
+        console.warn(`Gemini ${m} returned ${res.status}; retrying in ${wait} ms`);
+        await sleep(wait, signal);
+      } else break;
+    }
+    if (res!.ok) {
+      // Remember a replacement only when the earlier models are gone for good.
+      if (i > 0 && onlyRetiredSkipped) workingGeminiModel = m;
+      break;
+    }
+    if (res!.status === 404) {
+      if (i + 1 < models.length) console.warn(`Gemini model ${m} unavailable (404); trying ${models[i + 1]}`);
+      continue;
+    }
+    if (transient(res!.status) && i + 1 < models.length && deadline - Date.now() > 20_000) {
+      onlyRetiredSkipped = false;
+      console.warn(`Gemini ${m} still returning ${res!.status}; trying ${models[i + 1]}`);
+      continue;
+    }
+    break;
   }
-  const body = await res.json().catch(() => null);
-  if (!res.ok) {
-    const msg = body?.error?.message ?? res.statusText;
-    throw new AIError("provider_error", `Gemini error (${res.status}): ${msg}`, res.status === 429 ? 429 : 502);
+  const body = await res!.json().catch(() => null);
+  if (!res!.ok) {
+    const status = res!.status;
+    const msg = body?.error?.message ?? res!.statusText;
+    throw new AIError(
+      "provider_error",
+      status === 503 || status === 429
+        ? "The AI service is very busy right now. Please wait a moment and try again."
+        : `Gemini error (${status}): ${msg}`,
+      status === 429 ? 429 : status === 503 ? 503 : 502,
+    );
   }
   const candidate = body?.candidates?.[0];
-  const text = candidate?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("") ?? "";
+  const text = candidate?.content?.parts?.filter((p: { thought?: boolean }) => !p.thought).map((p: { text?: string }) => p.text ?? "").join("") ?? "";
   if (!text) {
     const reason = candidate?.finishReason ?? body?.promptFeedback?.blockReason ?? "empty response";
     throw new AIError("invalid_response", `Gemini returned no content (${reason}).`);

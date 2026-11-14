@@ -59,7 +59,8 @@ const EMPTY_SESSION: Session = {
   medVerified: {},
 };
 
-type Toast = { id: number; message: string; tone: "info" | "success" | "warning" };
+/** `translated`: the message is already in the user's language (otherwise it is English and translated when shown). */
+type Toast = { id: number; message: string; tone: "info" | "success" | "warning"; translated?: boolean };
 
 type Ctx = Session & {
   hydrated: boolean;
@@ -86,7 +87,7 @@ type Ctx = Session & {
   retryTranslation: () => void;
   provider: ProviderStatus | null;
   toasts: Toast[];
-  notify: (message: string, tone?: Toast["tone"]) => void;
+  notify: (message: string, tone?: Toast["tone"], translated?: boolean) => void;
   dismissToast: (id: number) => void;
 };
 
@@ -148,9 +149,9 @@ export function MedLensProvider({ children }: { children: React.ReactNode }) {
   const update = useCallback((fn: (s: Session) => Session) => setSession(fn), []);
   const setPrefs = useCallback((p: Partial<Prefs>) => setPrefsState((cur) => ({ ...cur, ...p })), []);
 
-  const notify = useCallback((message: string, tone: Toast["tone"] = "info") => {
+  const notify = useCallback((message: string, tone: Toast["tone"] = "info", translated = false) => {
     const id = ++toastId.current;
-    setToasts((t) => [...t, { id, message, tone }]);
+    setToasts((t) => [...t, { id, message, tone, translated }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 6000);
   }, []);
 
@@ -201,26 +202,55 @@ export function MedLensProvider({ children }: { children: React.ReactNode }) {
       inflight.current.add(key);
       setTxState((s) => ({ ...s, [lang.code]: { status: "loading" } }));
       try {
-        const entries = Object.fromEntries((force ? Object.keys(english) : missingKeys).map((k) => [k, english[k]]));
-        const res = await fetch("/api/translate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            language: { code: lang.code, name: lang.name },
-            entries,
-            protected: analysis ? protectedTerms(analysis) : [],
-          }),
-        });
-        const body = await res.json();
-        if (!res.ok) throw new Error(body?.error?.message ?? "Translation failed.");
-        update((s) => ({
-          ...s,
-          translations: { ...s.translations, [lang.code]: { ...(s.translations[lang.code] ?? {}), ...body.translations } },
-        }));
+        const todo = force ? Object.keys(english) : missingKeys;
+        const prot = analysis ? protectedTerms(analysis) : [];
+        let errorMessage: string | null = null;
+        const sendBatch = async (keys: string[]): Promise<string[]> => {
+          const res = await fetch("/api/translate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              language: { code: lang.code, name: lang.name },
+              entries: Object.fromEntries(keys.map((k) => [k, english[k]])),
+              protected: prot,
+            }),
+          });
+          const body = await res.json().catch(() => null);
+          if (!res.ok) {
+            errorMessage = body?.error?.message ?? "Translation failed.";
+            return keys;
+          }
+          // Show each batch as soon as it arrives.
+          update((s) => ({
+            ...s,
+            translations: { ...s.translations, [lang.code]: { ...(s.translations[lang.code] ?? {}), ...body.translations } },
+          }));
+          return (body.missing as string[] | undefined) ?? [];
+        };
+        // Batches of 60 entries, two at a time; anything missed is retried once.
+        const runAll = async (keys: string[]) => {
+          const batches: string[][] = [];
+          for (let i = 0; i < keys.length; i += 60) batches.push(keys.slice(i, i + 60));
+          const missed: string[] = [];
+          const queue = [...batches];
+          await Promise.all(
+            [0, 1].map(async () => {
+              for (let b = queue.shift(); b; b = queue.shift()) missed.push(...(await sendBatch(b)));
+            }),
+          );
+          return missed;
+        };
+        let missed = await runAll(todo);
+        if (missed.length) {
+          await new Promise((r) => setTimeout(r, 2000));
+          errorMessage = null;
+          missed = await runAll(missed);
+        }
+        if (missed.length === todo.length) throw new Error(errorMessage ?? "Translation failed.");
         setTxState((s) => ({
           ...s,
-          [lang.code]: body.missing?.length
-            ? { status: "ready", message: `${body.missing.length} item(s) could not be translated and are shown in English.` }
+          [lang.code]: missed.length
+            ? { status: "ready", message: "Some items could not be translated and are shown in English." }
             : { status: "ready" },
         }));
       } catch (e) {
@@ -283,7 +313,7 @@ export function MedLensProvider({ children }: { children: React.ReactNode }) {
     english,
     t,
     translationState: language.code === "en" ? { status: "ready" } : (txState[language.code] ?? { status: "idle" }),
-    retryTranslation: () => void translate(language, true),
+    retryTranslation: () => void translate(language),
     provider,
     toasts,
     notify,

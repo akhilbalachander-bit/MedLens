@@ -8,9 +8,11 @@ import { EmergencyBanner, FollowUpInfo, RecoveryChecklist, TrafficLight } from "
 import { SpeakButton } from "@/components/speech/ListenControls";
 import { TranslationStatus } from "@/components/LanguageSelector";
 import { btn, Card, SectionTitle } from "@/components/ui";
+import { useTr } from "@/lib/i18n";
 
 export default function InstructionsPage() {
   const { analysis, hydrated, t } = useMedLens();
+  const tr = useTr();
   if (!hydrated) return null;
   if (!analysis) return <NoAnalysis title="Health Instructions" />;
   return (
@@ -18,20 +20,22 @@ export default function InstructionsPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold text-ink">
-            <ClipboardList className="h-7 w-7 text-brand-700" /> Health Instructions
+            <ClipboardList className="h-7 w-7 text-brand-700" /> {tr("Health Instructions")}
           </h1>
-          <p className="mt-1 text-ink-soft">Your care instructions, warning signs and next steps from {analysis.facility_name ?? "your document"}.</p>
+          <p className="mt-1 text-ink-soft">
+            {tr("Your care instructions, warning signs and next steps from {place}.", { place: analysis.facility_name ?? tr("your document") })}
+          </p>
         </div>
         <Link href="/results" className={btn.secondary}>
-          <LayoutDashboard className="h-4 w-4" /> Full results
+          <LayoutDashboard className="h-4 w-4" /> {tr("Full results")}
         </Link>
       </div>
       <TranslationStatus />
       <EmergencyBanner />
       <Card>
-        <SectionTitle icon={<ClipboardList className="h-5 w-5" />}>Care instructions</SectionTitle>
+        <SectionTitle icon={<ClipboardList className="h-5 w-5" />}>{tr("Care instructions")}</SectionTitle>
         {analysis.instructions.length === 0 ? (
-          <p className="text-ink-muted">No care instructions were found in your document.</p>
+          <p className="text-ink-muted">{tr("No care instructions were found in your document.")}</p>
         ) : (
           <ul className="space-y-2">
             {analysis.instructions.map((i) => {
@@ -42,7 +46,7 @@ export default function InstructionsPage() {
                     <Localized as="p" className="text-lg text-ink">{simple}</Localized>
                     <p className="mt-1 font-mono text-xs text-ink-muted">{t("ui.docSays")}: {i.original}</p>
                   </div>
-                  <SpeakButton req={{ id: `inst-${i.id}`, label: "Instruction", text: simple }} />
+                  <SpeakButton req={{ id: `inst-${i.id}`, label: tr("Instruction"), text: simple }} />
                 </li>
               );
             })}

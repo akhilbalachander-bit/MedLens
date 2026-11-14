@@ -46,6 +46,11 @@ export function buildTranslatable(a: Analysis): Record<string, string> {
     put(`med.${m.id}.purpose`, m.purpose);
     put(`med.${m.id}.simple`, m.instructions_simple);
     put(`med.${m.id}.verify`, m.verification_reason);
+    put(`med.${m.id}.dose`, m.dose);
+    put(`med.${m.id}.route`, m.route);
+    put(`med.${m.id}.frequency`, m.frequency);
+    put(`med.${m.id}.duration`, m.duration);
+    put(`med.${m.id}.quantity`, m.quantity);
     m.warnings.forEach((w, i) => put(`med.${m.id}.warn.${i}`, w));
   }
   for (const ins of a.instructions) {
@@ -69,6 +74,7 @@ export function buildTranslatable(a: Analysis): Record<string, string> {
     put(`ts.${t.id}.timing`, t.timing);
     put(`ts.${t.id}.instructions`, t.instructions);
   }
+  a.uncertain_fields.forEach((u, i) => put(`uf.${i}.reason`, u.reason));
   return out;
 }
 

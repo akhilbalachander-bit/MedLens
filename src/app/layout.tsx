@@ -3,6 +3,7 @@ import "./globals.css";
 import { MedLensProvider } from "@/lib/store";
 import { SpeechProvider } from "@/components/speech/SpeechContext";
 import { AppShell } from "@/components/AppShell";
+import { UiTextProvider } from "@/lib/i18n";
 
 export const metadata: Metadata = {
   title: "MedLens — Understand your medical paperwork",
@@ -21,9 +22,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <MedLensProvider>
-          <SpeechProvider>
-            <AppShell>{children}</AppShell>
-          </SpeechProvider>
+          <UiTextProvider>
+            <SpeechProvider>
+              <AppShell>{children}</AppShell>
+            </SpeechProvider>
+          </UiTextProvider>
         </MedLensProvider>
       </body>
     </html>

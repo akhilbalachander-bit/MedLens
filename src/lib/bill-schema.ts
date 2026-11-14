@@ -115,7 +115,7 @@ export function normalizeBill(b: BillAnalysis): BillAnalysis {
  * *for human review only* — repeated items are often legitimate
  * (e.g. two doses of the same drug).
  */
-export function findPossibleDuplicates(items: BillLineItem[]): { item_ids: string[]; reason: string }[] {
+export function findPossibleDuplicates(items: BillLineItem[]): { item_ids: string[]; reason: string; local: true }[] {
   const groups = new Map<string, BillLineItem[]>();
   for (const li of items) {
     if (li.amount == null) continue;
@@ -131,9 +131,9 @@ export function findPossibleDuplicates(items: BillLineItem[]): { item_ids: strin
     .filter((g) => g.length > 1)
     .map((g) => ({
       item_ids: g.map((x) => x.id!),
-      reason: `${g.length} lines have the same description${g[0].code ? `, code ${g[0].code}` : ""}${
-        g[0].service_date ? `, date ${g[0].service_date}` : ""
-      } and amount. This can be legitimate (for example, two doses), but it is worth asking about.`,
+      // Fixed wording (translated in the UI); the lines themselves are listed under it.
+      reason: "These lines have the same description, code, date and amount. This can be legitimate (for example, two doses), but it is worth asking about.",
+      local: true as const,
     }));
 }
 

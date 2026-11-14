@@ -12,7 +12,7 @@ import { AIError } from "@/lib/ai/provider";
 const LIMITS = {
   analyze: { max: 20, windowMs: 60 * 60_000 },
   bill: { max: 20, windowMs: 60 * 60_000 },
-  translate: { max: 60, windowMs: 60 * 60_000 },
+  translate: { max: 150, windowMs: 60 * 60_000 },
   assistant: { max: 60, windowMs: 60 * 60_000 },
   tts: { max: 400, windowMs: 60 * 60_000 },
 } as const;

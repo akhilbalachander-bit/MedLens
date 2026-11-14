@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Camera, Check, Flashlight, FlashlightOff, RefreshCcw, RotateCcw, SwitchCamera, X, Upload } from "lucide-react";
 import { assessQuality, ISSUE_TEXT, samplePixels, type QualityIssue } from "@/lib/image-quality";
 import { btn, cx } from "../ui";
+import { useTr } from "@/lib/i18n";
 
 type Props = {
   pageCount: number;
@@ -45,6 +46,7 @@ export function CameraCapture({ pageCount, onCapture, onClose, onUnavailable }: 
   const [hint, setHint] = useState<QualityIssue | null>(null);
   const [flash, setFlash] = useState(false);
   const [added, setAdded] = useState<string | null>(null);
+  const tr = useTr();
 
   const track = () => streamRef.current?.getVideoTracks()[0] ?? null;
 
@@ -191,7 +193,7 @@ export function CameraCapture({ pageCount, onCapture, onClose, onUnavailable }: 
   const usePhoto = () => {
     if (!shot) return;
     onCapture(new File([shot.blob], `page-${pageCount + 1}.jpg`, { type: "image/jpeg" }));
-    setAdded(`Page ${pageCount + 1} added`);
+    setAdded(String(pageCount + 1));
     window.setTimeout(() => setAdded(null), 1600);
     setShot(null);
   };
@@ -205,15 +207,15 @@ export function CameraCapture({ pageCount, onCapture, onClose, onUnavailable }: 
     <div className="fixed inset-0 z-50 flex flex-col bg-black text-white" role="dialog" aria-modal="true" aria-label="Document camera">
       <div className="flex items-center justify-between gap-2 px-4 py-3">
         <p className="text-sm font-medium">
-          {shot ? "Is the text clear and readable?" : `Page ${pageCount + 1} — fit the whole page in the frame`}
+          {shot ? tr("Is the text clear and readable?") : tr("Page {n} — fit the whole page in the frame", { n: pageCount + 1 })}
         </p>
         <div className="flex items-center gap-1">
           {torchSupported && !shot && (
-            <button onClick={toggleTorch} className={cx("rounded-full p-2", torch ? "bg-amber-300 text-black" : "hover:bg-white/10")} aria-pressed={torch} aria-label={torch ? "Turn flashlight off" : "Turn flashlight on"}>
+            <button onClick={toggleTorch} className={cx("rounded-full p-2", torch ? "bg-amber-300 text-black" : "hover:bg-white/10")} aria-pressed={torch} aria-label={torch ? tr("Turn flashlight off") : tr("Turn flashlight on")}>
               {torch ? <Flashlight className="h-6 w-6" /> : <FlashlightOff className="h-6 w-6" />}
             </button>
           )}
-          <button onClick={close} className="rounded-full p-2 hover:bg-white/10" aria-label="Close camera">
+          <button onClick={close} className="rounded-full p-2 hover:bg-white/10" aria-label={tr("Close camera")}>
             <X className="h-6 w-6" />
           </button>
         </div>
@@ -223,7 +225,7 @@ export function CameraCapture({ pageCount, onCapture, onClose, onUnavailable }: 
         <video ref={videoRef} playsInline muted className={`h-full w-full object-contain ${shot ? "hidden" : ""}`} />
         {shot && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={shot.url} alt={`Captured page ${pageCount + 1}`} className="h-full w-full object-contain" />
+          <img src={shot.url} alt={tr("Captured page {n}", { n: pageCount + 1 })} className="h-full w-full object-contain" />
         )}
         {!shot && ready && (
           <div className="pointer-events-none absolute inset-6 rounded-2xl border-2 border-dashed border-white/60" aria-hidden>
@@ -234,35 +236,35 @@ export function CameraCapture({ pageCount, onCapture, onClose, onUnavailable }: 
         )}
         {!shot && ready && hint && (
           <p role="status" className="absolute inset-x-4 top-4 mx-auto w-fit rounded-full bg-black/70 px-4 py-2 text-center text-sm font-medium">
-            {ISSUE_TEXT[hint].live}
+            {tr(ISSUE_TEXT[hint].live)}
           </p>
         )}
         {shot && shot.issues.length > 0 && (
           <div role="alert" className="absolute inset-x-4 top-4 mx-auto flex max-w-md items-start gap-2 rounded-xl bg-amber-300 px-4 py-3 text-sm font-medium text-black">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
             <span>
-              {shot.issues.map((i) => ISSUE_TEXT[i].after).join(" ")} The text may be misread — consider retaking it.
+              {shot.issues.map((i) => tr(ISSUE_TEXT[i].after)).join(" ")} {tr("The text may be misread — consider retaking it.")}
             </span>
           </div>
         )}
         {added && (
           <p role="status" className="absolute inset-x-0 bottom-4 mx-auto w-fit rounded-full bg-brand-500 px-4 py-2 text-sm font-semibold text-black">
             <Check className="mr-1 inline h-4 w-4" />
-            {added}
+            {tr("Page {n} added", { n: added })}
           </p>
         )}
         {flash && <div className="pointer-events-none absolute inset-0 bg-white/70" aria-hidden />}
-        {starting && <p className="absolute inset-0 grid place-items-center text-sm text-white/80">Starting camera…</p>}
+        {starting && <p className="absolute inset-0 grid place-items-center text-sm text-white/80">{tr("Starting camera…")}</p>}
       </div>
 
       <div className="flex items-center justify-center gap-4 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4">
         {shot ? (
           <>
             <button onClick={() => setShot(null)} className="inline-flex items-center gap-2 rounded-xl bg-white/15 px-5 py-3 font-semibold hover:bg-white/25">
-              <RotateCcw className="h-5 w-5" /> Retake
+              <RotateCcw className="h-5 w-5" /> {tr("Retake")}
             </button>
             <button onClick={usePhoto} className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-5 py-3 font-semibold text-black hover:bg-brand-400">
-              <Check className="h-5 w-5" /> {shot.issues.length ? "Use anyway" : "Use photo"}
+              <Check className="h-5 w-5" /> {shot.issues.length ? tr("Use anyway") : tr("Use photo")}
             </button>
           </>
         ) : (
@@ -271,7 +273,7 @@ export function CameraCapture({ pageCount, onCapture, onClose, onUnavailable }: 
               onClick={() => setFacing((f) => (f === "environment" ? "user" : "environment"))}
               disabled={deviceCount < 2}
               className="rounded-full bg-white/15 p-3 hover:bg-white/25 disabled:opacity-30"
-              aria-label="Switch camera"
+              aria-label={tr("Switch camera")}
             >
               <SwitchCamera className="h-6 w-6" />
             </button>
@@ -279,7 +281,7 @@ export function CameraCapture({ pageCount, onCapture, onClose, onUnavailable }: 
               onClick={() => void capture()}
               disabled={!ready || busy}
               className="grid h-20 w-20 place-items-center rounded-full border-4 border-white bg-white/20 hover:bg-white/30 disabled:opacity-40"
-              aria-label="Take photo"
+              aria-label={tr("Take photo")}
             >
               <Camera className="h-8 w-8" />
             </button>
@@ -287,7 +289,7 @@ export function CameraCapture({ pageCount, onCapture, onClose, onUnavailable }: 
               onClick={close}
               className="inline-flex min-w-[3rem] items-center gap-1 rounded-full bg-white/15 px-4 py-3 text-sm font-semibold hover:bg-white/25"
             >
-              {pageCount > 0 ? <><Check className="h-5 w-5" /> Done ({pageCount})</> : "Cancel"}
+              {pageCount > 0 ? <><Check className="h-5 w-5" /> {tr("Done")} ({pageCount})</> : tr("Cancel")}
             </button>
           </>
         )}
@@ -298,20 +300,21 @@ export function CameraCapture({ pageCount, onCapture, onClose, onUnavailable }: 
 
 /** Shown when the live camera can't be used: native capture input + upload. */
 export function CameraFallback({ reason, onFiles, onRetry }: { reason: string; onFiles: (f: FileList | null) => void; onRetry: () => void }) {
+  const tr = useTr();
   return (
     <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-950">
-      <p className="font-medium">{reason}</p>
+      <p className="font-medium">{tr(reason)}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         <label className={btn.primary + " cursor-pointer"}>
-          <Camera className="h-5 w-5" /> Use phone camera app
+          <Camera className="h-5 w-5" /> {tr("Use phone camera app")}
           <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={(e) => onFiles(e.target.files)} />
         </label>
         <label className={btn.secondary + " cursor-pointer"}>
-          <Upload className="h-5 w-5" /> Upload photo or PDF
+          <Upload className="h-5 w-5" /> {tr("Upload photo or PDF")}
           <input type="file" multiple accept="image/*,application/pdf" className="sr-only" onChange={(e) => onFiles(e.target.files)} />
         </label>
         <button onClick={onRetry} className={btn.ghost}>
-          <RefreshCcw className="h-4 w-4" /> Try camera again
+          <RefreshCcw className="h-4 w-4" /> {tr("Try camera again")}
         </button>
       </div>
     </div>

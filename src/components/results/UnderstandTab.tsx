@@ -7,6 +7,7 @@ import { useMedLens } from "@/lib/store";
 import { ListenBar, SpeakButton } from "../speech/ListenControls";
 import { Badge, Card, cx, Notice, SectionTitle } from "../ui";
 import { joinSpeech, Localized } from "./shared";
+import { useTr } from "@/lib/i18n";
 
 const CATEGORY_LABEL: Record<string, string> = {
   activity: "Activity",
@@ -21,6 +22,7 @@ const CATEGORY_LABEL: Record<string, string> = {
 
 export function UnderstandTab() {
   const { analysis, t, language } = useMedLens();
+  const tr = useTr();
   const a = analysis!;
   const nonEn = language.code !== "en";
 
@@ -36,7 +38,7 @@ export function UnderstandTab() {
 
   return (
     <div className="space-y-5">
-      <ListenBar full={{ id: "understand-all", label: "Understand your health (everything)", text: fullText }} sticky={false} />
+      <ListenBar full={{ id: "understand-all", label: tr("Understand your health (everything)"), text: fullText }} sticky={false} />
 
       {/* A. What happened */}
       <Card id="what-happened">
@@ -51,7 +53,7 @@ export function UnderstandTab() {
             {t("summary.simple", a.patient_summary.simple_english)}
           </Localized>
         ) : (
-          <Notice tone="info">Your document does not include a visit summary, so MedLens did not write one. See the instructions below.</Notice>
+          <Notice tone="info">{tr("Your document does not include a visit summary, so MedLens did not write one. See the instructions below.")}</Notice>
         )}
         {a.patient_summary.original && (
           <OriginalToggle label={t("ui.docSays")} text={a.patient_summary.original} />
@@ -94,12 +96,12 @@ export function UnderstandTab() {
                   </span>
                   {m.status !== "unknown" && (
                     <Badge tone={m.status === "stop" ? "red" : m.status === "changed" ? "amber" : m.status === "new" ? "blue" : "slate"}>
-                      {m.status === "continue" ? "Keep taking" : m.status === "stop" ? "Stop" : m.status === "changed" ? "Changed" : "New"}
+                      {tr(m.status === "continue" ? "Keep taking" : m.status === "stop" ? "Stop taking" : m.status === "changed" ? "Changed" : "New")}
                     </Badge>
                   )}
                   {m.needs_verification && (
                     <Badge tone="amber">
-                      <AlertTriangle className="h-3 w-3" /> Check with pharmacist
+                      <AlertTriangle className="h-3 w-3" /> {tr("Check with pharmacist")}
                     </Badge>
                   )}
                 </div>
@@ -112,7 +114,7 @@ export function UnderstandTab() {
             ))}
           </ul>
           <Link href="/medications" className="mt-3 inline-block text-sm font-semibold text-brand-800 underline">
-            See full medication details
+            {tr("See full medication details")}
           </Link>
         </Card>
       )}
@@ -121,12 +123,12 @@ export function UnderstandTab() {
       <Card id="instructions">
         <SectionTitle
           icon={<MessageSquareText className="h-5 w-5" />}
-          action={<SpeakButton req={{ id: "instructions", label: "Instructions", text: instructionsText }} label="Listen to all" />}
+          action={<SpeakButton req={{ id: "instructions", label: tr("Instructions"), text: instructionsText }} label="Listen to all" />}
         >
-          Your instructions
+          {tr("Your instructions")}
         </SectionTitle>
         {a.instructions.length === 0 ? (
-          <Notice tone="info">No care instructions were found in your document.</Notice>
+          <Notice tone="info">{tr("No care instructions were found in your document.")}</Notice>
         ) : (
           <>
             <div className="mb-2 hidden grid-cols-2 gap-4 px-1 text-xs font-semibold uppercase tracking-wide text-ink-muted md:grid">
@@ -140,7 +142,7 @@ export function UnderstandTab() {
                     <p className="mb-1 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-ink-muted md:hidden">
                       <FileText className="h-3.5 w-3.5" /> <Localized as="span">{t("ui.docSays")}</Localized>
                     </p>
-                    <Badge>{CATEGORY_LABEL[ins.category]}</Badge>
+                    <Badge>{tr(CATEGORY_LABEL[ins.category])}</Badge>
                     <p className="mt-1 font-mono text-sm text-ink-soft">{ins.original}</p>
                     {nonEn && t(`ins.${ins.id}.orig`) !== ins.original && (
                       <Localized as="p" className="mt-1 text-xs text-ink-muted">
@@ -157,7 +159,7 @@ export function UnderstandTab() {
                     </Localized>
                     <SpeakButton
                       className="mt-2"
-                      req={{ id: `ins-${ins.id}`, label: CATEGORY_LABEL[ins.category], text: t(`ins.${ins.id}.simple`, ins.simple ?? ins.original) }}
+                      req={{ id: `ins-${ins.id}`, label: tr(CATEGORY_LABEL[ins.category]), text: t(`ins.${ins.id}.simple`, ins.simple ?? ins.original) }}
                     />
                   </div>
                 </li>
@@ -191,6 +193,7 @@ function OriginalToggle({ label, text }: { label: string; text: string }) {
 
 function Glossary() {
   const { analysis, t, language } = useMedLens();
+  const tr = useTr();
   const items = useMemo(
     () => [...analysis!.glossary].sort((x, y) => Number(y.appears_in_document) - Number(x.appears_in_document)),
     [analysis],
@@ -201,7 +204,7 @@ function Glossary() {
     return (
       <Card>
         <SectionTitle icon={<BookOpen className="h-5 w-5" />}>{t("ui.glossary")}</SectionTitle>
-        <p className="text-ink-muted">No confusing medical terms were found in your document.</p>
+        <p className="text-ink-muted">{tr("No confusing medical terms were found in your document.")}</p>
       </Card>
     );
   return (
@@ -213,13 +216,13 @@ function Glossary() {
             className="text-sm font-medium text-brand-800 underline"
             onClick={() => setOpen(allOpen ? {} : Object.fromEntries(items.map((g) => [g.id!, true])))}
           >
-            {allOpen ? "Hide all" : "Show all"}
+            {tr(allOpen ? "Hide all" : "Show all")}
           </button>
         }
       >
         <Localized as="span">{t("ui.glossary")}</Localized>
       </SectionTitle>
-      <p className="mb-3 text-sm text-ink-muted">Tap a word to see what it means.</p>
+      <p className="mb-3 text-sm text-ink-muted">{tr("Tap a word to see what it means.")}</p>
       <ul className="grid gap-3 sm:grid-cols-2">
         {items.map((g) => {
           const isOpen = !!open[g.id!];
@@ -238,11 +241,11 @@ function Glossary() {
                 <div className="px-3 pb-3">
                   <Localized as="p" className="text-ink">{def}</Localized>
                   {language.code !== "en" && def !== g.simple_definition && (
-                    <p className="mt-1 text-xs text-ink-muted">English: {g.simple_definition}</p>
+                    <p className="mt-1 text-xs text-ink-muted">{tr("English")}: {g.simple_definition}</p>
                   )}
                   <div className="mt-2 flex items-center gap-2">
                     <SpeakButton req={{ id: `gl-${g.id}`, label: g.term, text: `${g.term}. ${def}` }} />
-                    {!g.appears_in_document && <Badge>Related term</Badge>}
+                    {!g.appears_in_document && <Badge>{tr("Related term")}</Badge>}
                   </div>
                 </div>
               )}

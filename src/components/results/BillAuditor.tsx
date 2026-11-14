@@ -10,6 +10,7 @@ import { SpeakButton } from "../speech/ListenControls";
 import { Badge, btn, Card, cx, Notice, SectionTitle } from "../ui";
 import { DocumentCapture } from "../scan/DocumentCapture";
 import { AnalysisProgress, BILL_STAGES } from "../scan/AnalysisProgress";
+import { useTr } from "@/lib/i18n";
 
 const CAT_LABEL: Record<string, string> = {
   room_and_board: "Room & board",
@@ -28,7 +29,8 @@ const money = (n: number | null | undefined) =>
   n == null ? "—" : n.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: n % 1 ? 2 : 0 });
 
 export function BillAuditor() {
-  const { bill, setBill, notify } = useMedLens();
+  const { bill, setBill, notify, language } = useMedLens();
+  const tr = useTr();
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<{ code: string; message: string } | null>(null);
@@ -49,6 +51,7 @@ export function BillAuditor() {
       const prepared = await Promise.all(files.map((f) => prepareImage(f)));
       const form = new FormData();
       prepared.forEach((f) => form.append("files", f, f.name));
+      form.append("language", language.name);
       const res = await fetch("/api/bill", { method: "POST", body: form });
       const body = await res.json().catch(() => null);
       if (!res.ok) throw Object.assign(new Error(body?.error?.message ?? "Bill analysis failed."), { code: body?.error?.code });
@@ -74,18 +77,17 @@ export function BillAuditor() {
         action={
           bill && (
             <button className={btn.ghost} onClick={() => setBill(null)}>
-              <RotateCcw className="h-4 w-4" /> Check another bill
+              <RotateCcw className="h-4 w-4" /> {tr("Check another bill")}
             </button>
           )
         }
       >
-        Hospital bill auditor
+        {tr("Hospital bill auditor")}
       </SectionTitle>
       {!bill && !busy && (
         <>
           <p className="mb-3 text-ink-soft">
-            Photograph or upload your hospital bill. MedLens lists each charge, explains billing words, and points out items you may want to ask
-            about. It never decides that a charge is wrong.
+            {tr("Photograph or upload your hospital bill. MedLens lists each charge, explains billing words, and points out items you may want to ask about. It never decides that a charge is wrong.")}
           </p>
           <DocumentCapture
             variant="compact"
@@ -97,9 +99,9 @@ export function BillAuditor() {
           />
           {error && (
             <Notice tone={error.code === "provider_not_configured" ? "info" : "danger"} className="mt-3">
-              <p>{error.message}</p>
+              <p>{tr(error.message)}</p>
               <button onClick={loadSample} className={cx(btn.secondary, "mt-2")}>
-                Try a sample bill
+                {tr("Try a sample bill")}
               </button>
             </Notice>
           )}
@@ -113,6 +115,9 @@ export function BillAuditor() {
 
 function BillReport({ bill }: { bill: BillAnalysisResult }) {
   const [view, setView] = useState<"category" | "list">("category");
+  const tr = useTr();
+  // A real bill is written in the patient's language by the AI; the built-in sample is English and translated here.
+  const c = (s: string | null | undefined) => (s && bill.meta.source !== "ai" ? tr(s) : (s ?? ""));
   const items = bill.line_items;
   const byId = useMemo(() => new Map(items.map((i) => [i.id!, i])), [items]);
 
@@ -144,61 +149,66 @@ function BillReport({ bill }: { bill: BillAnalysisResult }) {
   const itemsTotal = groups.reduce((s, g) => s + g.total, 0);
   const totalMismatch = bill.total_charges != null && items.length > 0 && Math.abs(itemsTotal - bill.total_charges) > 1;
 
-  const speech = [bill.plain_summary, duplicates.length ? `${duplicates.length} possible duplicate charge group(s) to ask about.` : "", bill.needs_clarification.length ? `${bill.needs_clarification.length} item(s) may need clarification.` : ""].filter(Boolean).join(" ");
+  const speech = [
+    c(bill.plain_summary),
+    duplicates.length ? tr("Possible duplicate charges to ask about: {count}.", { count: duplicates.length }) : "",
+    bill.needs_clarification.length ? tr("Items that may need clarification: {count}.", { count: bill.needs_clarification.length }) : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div className="space-y-4">
-      {bill.meta.source !== "ai" && <Badge tone="amber">{bill.meta.source === "mock" ? "Mock AI — fictional bill" : "Fictional sample bill"}</Badge>}
+      {bill.meta.source !== "ai" && <Badge tone="amber">{tr(bill.meta.source === "mock" ? "Mock AI — fictional bill" : "Fictional sample bill")}</Badge>}
 
       <div className="grid gap-2 sm:grid-cols-4">
-        <Stat label="Total charges" value={money(bill.total_charges ?? (items.length ? itemsTotal : null))} />
-        <Stat label="Insurance paid" value={money(bill.insurance_payments)} />
-        <Stat label="Adjustments" value={money(bill.adjustments)} />
-        <Stat label="Amount due" value={money(bill.amount_due)} strong />
+        <Stat label={tr("Total charges")} value={money(bill.total_charges ?? (items.length ? itemsTotal : null))} />
+        <Stat label={tr("Insurance paid")} value={money(bill.insurance_payments)} />
+        <Stat label={tr("Adjustments")} value={money(bill.adjustments)} />
+        <Stat label={tr("Amount due")} value={money(bill.amount_due)} strong />
       </div>
       <p className="text-sm text-ink-muted">
-        {bill.facility_name ?? "Facility not listed"} · Account {bill.patient_account_number ?? "not listed"} · Service {bill.service_dates ?? "date not listed"}
-        {bill.due_date ? ` · Due ${bill.due_date}` : ""}
+        {bill.facility_name ?? tr("Facility not listed")} · {tr("Account")} {bill.patient_account_number ?? tr("not listed")} · {tr("Service")}{" "}
+        {bill.service_dates ?? tr("date not listed")}
+        {bill.due_date ? ` · ${tr("Due {date}", { date: bill.due_date })}` : ""}
       </p>
 
       {bill.plain_summary && (
         <div className="rounded-xl bg-brand-50/70 p-3">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="font-semibold text-ink">Your bill in plain words</h3>
-            <SpeakButton req={{ id: "bill-summary", label: "Bill summary", text: speech }} />
+            <h3 className="font-semibold text-ink">{tr("Your bill in plain words")}</h3>
+            <SpeakButton req={{ id: "bill-summary", label: tr("Bill summary"), text: speech }} />
           </div>
-          <p className="mt-1 text-ink">{bill.plain_summary}</p>
+          <p className="mt-1 text-ink">{c(bill.plain_summary)}</p>
         </div>
       )}
 
       {!bill.is_itemized && (
         <Notice tone="warning" icon={<FileSearch className="h-5 w-5" />}>
-          This looks like a summary bill, not an itemized one. You have the right to ask for an itemized bill — use the “Request an itemized bill”
-          letter below.
+          {tr("This looks like a summary bill, not an itemized one. You have the right to ask for an itemized bill — use the “Request an itemized bill” letter below.")}
         </Notice>
       )}
       {totalMismatch && (
         <Notice tone="warning" icon={<HelpCircle className="h-5 w-5" />}>
-          The line items we could read add up to {money(itemsTotal)}, but the bill total says {money(bill.total_charges)}. Some lines may be on a
-          page we did not see, or it may be worth asking the billing office to explain the difference.
+          {tr("The line items we could read add up to {sum}, but the bill total says {total}. Some lines may be on a page we did not see, or it may be worth asking the billing office to explain the difference.", { sum: money(itemsTotal), total: money(bill.total_charges) })}
         </Notice>
       )}
 
       {(duplicates.length > 0 || bill.needs_clarification.length > 0) && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 p-3">
           <h3 className="flex items-center gap-2 font-semibold text-amber-950">
-            <AlertTriangle className="h-5 w-5" /> Items to review with the billing office
+            <AlertTriangle className="h-5 w-5" /> {tr("Items to review with the billing office")}
           </h3>
           <p className="mt-1 text-sm text-amber-950">
-            These are questions to ask, not mistakes. There may be a good reason for each charge. Only the hospital can confirm.
+            {tr("These are questions to ask, not mistakes. There may be a good reason for each charge. Only the hospital can confirm.")}
           </p>
           <ul className="mt-2 space-y-2">
             {duplicates.map((d, i) => (
               <li key={`d${i}`} className="rounded-lg bg-white p-2.5 text-sm">
                 <p className="flex items-center gap-1.5 font-semibold text-ink">
-                  <CopyCheck className="h-4 w-4 text-amber-700" /> Possible duplicate
+                  <CopyCheck className="h-4 w-4 text-amber-700" /> {tr("Possible duplicate")}
                 </p>
-                <p className="text-ink-soft">{d.reason}</p>
+                <p className="text-ink-soft">{"local" in d ? tr(d.reason) : c(d.reason)}</p>
                 <ul className="mt-1 text-ink">
                   {d.item_ids.map((id) => (
                     <li key={id}>
@@ -208,14 +218,14 @@ function BillReport({ bill }: { bill: BillAnalysisResult }) {
                 </ul>
               </li>
             ))}
-            {bill.needs_clarification.map((c, i) => {
-              const li = c.item_id ? byId.get(c.item_id) : undefined;
+            {bill.needs_clarification.map((q, i) => {
+              const li = q.item_id ? byId.get(q.item_id) : undefined;
               return (
                 <li key={`c${i}`} className="rounded-lg bg-white p-2.5 text-sm">
                   <p className="flex items-center gap-1.5 font-semibold text-ink">
-                    <HelpCircle className="h-4 w-4 text-amber-700" /> {li ? `${li.description} — ${money(li.amount)}` : "Question to ask"}
+                    <HelpCircle className="h-4 w-4 text-amber-700" /> {li ? `${li.description} — ${money(li.amount)}` : tr("Question to ask")}
                   </p>
-                  <p className="text-ink-soft">{c.reason}</p>
+                  <p className="text-ink-soft">{c(q.reason)}</p>
                 </li>
               );
             })}
@@ -225,23 +235,25 @@ function BillReport({ bill }: { bill: BillAnalysisResult }) {
 
       <div>
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="font-semibold text-ink">Charges ({items.length})</h3>
-          <div className="inline-flex overflow-hidden rounded-lg border border-slate-300 text-sm" role="group" aria-label="View charges">
+          <h3 className="font-semibold text-ink">
+            {tr("Charges")} ({items.length})
+          </h3>
+          <div className="inline-flex overflow-hidden rounded-lg border border-slate-300 text-sm" role="group" aria-label={tr("View charges")}>
             {(["category", "list"] as const).map((v) => (
               <button key={v} onClick={() => setView(v)} aria-pressed={view === v} className={cx("px-3 py-1.5 font-medium", view === v ? "bg-brand-700 text-white" : "hover:bg-slate-50")}>
-                {v === "category" ? "By category" : "All lines"}
+                {tr(v === "category" ? "By category" : "All lines")}
               </button>
             ))}
           </div>
         </div>
         {items.length === 0 ? (
-          <p className="text-ink-muted">No individual charges could be read from this bill.</p>
+          <p className="text-ink-muted">{tr("No individual charges could be read from this bill.")}</p>
         ) : view === "category" ? (
           <div className="space-y-3">
             {groups.map((g) => (
               <details key={g.cat} className="rounded-xl border border-slate-200" open={groups.length <= 4}>
                 <summary className="flex cursor-pointer items-center justify-between gap-2 p-3">
-                  <span className="font-medium text-ink">{CAT_LABEL[g.cat] ?? g.cat}</span>
+                  <span className="font-medium text-ink">{tr(CAT_LABEL[g.cat] ?? g.cat)}</span>
                   <span className="flex items-center gap-3">
                     <span className="hidden h-2 w-28 overflow-hidden rounded-full bg-slate-100 sm:block" aria-hidden>
                       <span className="block h-full bg-brand-600" style={{ width: `${itemsTotal ? (g.total / itemsTotal) * 100 : 0}%` }} />
@@ -249,13 +261,13 @@ function BillReport({ bill }: { bill: BillAnalysisResult }) {
                     <span className="font-semibold tabular-nums">{money(g.total)}</span>
                   </span>
                 </summary>
-                <LineTable items={g.list} flagged={flagged} />
+                <LineTable items={g.list} flagged={flagged} c={c} />
               </details>
             ))}
           </div>
         ) : (
           <div className="rounded-xl border border-slate-200">
-            <LineTable items={items} flagged={flagged} />
+            <LineTable items={items} flagged={flagged} c={c} />
           </div>
         )}
       </div>
@@ -263,27 +275,27 @@ function BillReport({ bill }: { bill: BillAnalysisResult }) {
       {bill.terminology.length > 0 && (
         <div>
           <h3 className="mb-2 flex items-center gap-2 font-semibold text-ink">
-            <BookOpen className="h-4 w-4 text-brand-700" /> Billing words explained
+            <BookOpen className="h-4 w-4 text-brand-700" /> {tr("Billing words explained")}
           </h3>
           <dl className="grid gap-2 sm:grid-cols-2">
             {bill.terminology.map((t) => (
               <div key={t.term} className="rounded-xl bg-slate-50 p-3">
                 <dt className="font-semibold text-ink">{t.term}</dt>
-                <dd className="text-sm text-ink-soft">{t.explanation}</dd>
+                <dd className="text-sm text-ink-soft">{c(t.explanation)}</dd>
               </div>
             ))}
           </dl>
         </div>
       )}
       <p className="text-xs text-ink-muted">
-        MedLens reads and explains your bill. It does not decide whether any charge is correct, fraudulent or coded properly. Contact the hospital
-        billing office or your insurer with questions. Your bill is not stored by MedLens.
+        {tr("MedLens reads and explains your bill. It does not decide whether any charge is correct, fraudulent or coded properly. Contact the hospital billing office or your insurer with questions. Your bill is not stored by MedLens.")}
       </p>
     </div>
   );
 }
 
-function LineTable({ items, flagged }: { items: BillLineItem[]; flagged: Map<string, string[]> }) {
+function LineTable({ items, flagged, c }: { items: BillLineItem[]; flagged: Map<string, string[]>; c: (s: string | null | undefined) => string }) {
+  const tr = useTr();
   return (
     <ul className="divide-y divide-slate-100 border-t border-slate-100">
       {items.map((li) => (
@@ -291,12 +303,14 @@ function LineTable({ items, flagged }: { items: BillLineItem[]; flagged: Map<str
           <div className="min-w-0">
             <p className="font-medium text-ink">{li.description}</p>
             <p className="text-xs text-ink-muted">
-              {[li.service_date, li.code && `Code ${li.code}`, li.quantity != null && li.quantity !== 1 && `Qty ${li.quantity}`].filter(Boolean).join(" · ") || "No date or code listed"}
+              {[li.service_date, li.code && `${tr("Code")} ${li.code}`, li.quantity != null && li.quantity !== 1 && `${tr("Qty")} ${li.quantity}`]
+                .filter(Boolean)
+                .join(" · ") || tr("No date or code listed")}
             </p>
-            {li.plain_explanation && <p className="mt-0.5 text-sm text-ink-soft">{li.plain_explanation}</p>}
+            {li.plain_explanation && <p className="mt-0.5 text-sm text-ink-soft">{c(li.plain_explanation)}</p>}
             {flagged.get(li.id!)?.map((f) => (
               <Badge key={f} tone="amber">
-                {f}
+                {tr(f)}
               </Badge>
             ))}
           </div>

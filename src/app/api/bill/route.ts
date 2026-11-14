@@ -6,7 +6,7 @@ import { errorResponse, readUploads } from "@/lib/server/uploads";
 import { sampleBillResult } from "@/lib/sample/bill";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
 /** Hospital Bill Auditor: one vision call per uploaded bill. Not stored. */
@@ -27,7 +27,9 @@ export async function POST(req: Request) {
     }
     if (cfg.provider === "mock") return Response.json(sampleBillResult("mock"));
 
-    const raw = await generateJson(cfg, { system: BILL_SYSTEM, prompt: billPrompt(files.length), files });
+    const rawLang = String(form.get("language") ?? "English");
+    const languageName = /^[\p{L} ()-]{2,60}$/u.test(rawLang) ? rawLang : "English";
+    const raw = await generateJson(cfg, { system: BILL_SYSTEM, prompt: billPrompt(files.length, languageName), files, timeoutMs: 270_000 });
     const parsed = BillAnalysisSchema.safeParse(raw);
     if (!parsed.success) throw new AIError("invalid_response", "The AI response did not match the expected bill format.");
     const result: BillAnalysisResult = {

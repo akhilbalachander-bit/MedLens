@@ -10,6 +10,7 @@ import { useSpeech } from "@/components/speech/SpeechContext";
 import { SpeakButton } from "@/components/speech/ListenControls";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { Badge, btn, Card, cx, Notice } from "@/components/ui";
+import { useTr } from "@/lib/i18n";
 
 type Msg = { id: number; role: "user" | "assistant"; text: string; urgent?: boolean; sources?: string[]; offline?: boolean };
 
@@ -25,6 +26,7 @@ const SUGGESTIONS = [
 export default function AssistantPage() {
   const { analysis, language, t, provider } = useMedLens();
   const speech = useSpeech();
+  const tr = useTr();
   const rec = useSpeechRecognition(language.speech);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -61,15 +63,15 @@ export default function AssistantPage() {
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error?.message ?? "failed");
       let text: string = body.answer;
-      if ((body.urgent || detectEmergency(q)) && !/911/.test(text)) text = `${EMERGENCY_MESSAGE} ${text}`;
+      if ((body.urgent || detectEmergency(q)) && !/911/.test(text)) text = `${tr(EMERGENCY_MESSAGE)} ${text}`;
       reply = { id: ++idRef.current, role: "assistant", text, urgent: body.urgent || detectEmergency(q), sources: body.sources };
     } catch {
-      const r = localAnswer(q, analysis, t);
+      const r = localAnswer(q, analysis, t, tr);
       reply = { id: ++idRef.current, role: "assistant", text: r.answer, urgent: r.urgent, sources: r.sources, offline: true };
     }
     setMessages((m) => [...m, reply]);
     setBusy(false);
-    if (autoSpeak) speech.speak({ id: `msg-${reply.id}`, label: "Assistant answer", text: reply.text });
+    if (autoSpeak) speech.speak({ id: `msg-${reply.id}`, label: tr("Assistant answer"), text: reply.text });
   };
 
   const showText = typing || !rec.supported;
@@ -79,33 +81,36 @@ export default function AssistantPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold text-ink">
-            <Mic className="h-7 w-7 text-brand-700" /> Voice Assistant
+            <Mic className="h-7 w-7 text-brand-700" /> {tr("Voice Assistant")}
           </h1>
           <p className="mt-1 text-ink-soft">
-            Ask about your paperwork out loud or by typing. {analysis ? `Answers use your document from ${analysis.facility_name ?? "your scan"}.` : "Scan a document first for answers about it."}
+            {tr("Ask about your paperwork out loud or by typing.")}{" "}
+            {analysis
+              ? tr("Answers use your document from {place}.", { place: analysis.facility_name ?? tr("your scan") })
+              : tr("Scan a document first for answers about it.")}
           </p>
         </div>
         <LanguageSelector />
       </div>
 
       <Notice tone="danger" icon={<AlertOctagon className="h-5 w-5" />}>
-        This assistant explains your paperwork; it cannot diagnose or give medical advice. <strong>For an emergency, call 911.</strong>
+        {tr("This assistant explains your paperwork; it cannot diagnose or give medical advice.")} <strong>{tr("For an emergency, call 911.")}</strong>
       </Notice>
 
       {!provider?.configured && provider && (
         <Notice tone="info">
-          No AI provider is configured, so the assistant is in offline mode: it looks up answers directly in your document.
+          {tr("No AI provider is configured, so the assistant is in offline mode: it looks up answers directly in your document.")}
         </Notice>
       )}
 
       <Card className="min-h-[300px]">
         {messages.length === 0 ? (
           <div>
-            <p className="mb-3 font-medium text-ink">Try asking:</p>
+            <p className="mb-3 font-medium text-ink">{tr("Try asking:")}</p>
             <div className="flex flex-wrap gap-2">
               {SUGGESTIONS.map((s) => (
-                <button key={s} onClick={() => ask(s)} className="rounded-full border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm text-brand-900 hover:bg-brand-100">
-                  {s}
+                <button key={s} onClick={() => ask(tr(s))} className="rounded-full border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm text-brand-900 hover:bg-brand-100">
+                  {tr(s)}
                 </button>
               ))}
             </div>
@@ -124,34 +129,34 @@ export default function AssistantPage() {
                 >
                   {m.role === "assistant" && (
                     <p className="mb-1 flex items-center gap-1 text-xs font-semibold text-ink-muted">
-                      <Bot className="h-3.5 w-3.5" /> MedLens {m.offline && <Badge>offline lookup</Badge>}
+                      <Bot className="h-3.5 w-3.5" /> MedLens {m.offline && <Badge>{tr("answered from your document")}</Badge>}
                     </p>
                   )}
                   <p className="whitespace-pre-wrap text-[17px] leading-relaxed">{m.text}</p>
                   {m.role === "assistant" && (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <SpeakButton req={{ id: `msg-${m.id}`, label: "Assistant answer", text: m.text }} />
+                      <SpeakButton req={{ id: `msg-${m.id}`, label: tr("Assistant answer"), text: m.text }} />
                       {m.urgent && (
                         <a href="tel:911" className="rounded-full bg-red-600 px-3 py-1.5 text-sm font-bold text-white">
-                          Call 911
+                          {tr("Call 911")}
                         </a>
                       )}
                       {m.sources?.map((s) => (
-                        <Badge key={s}>{s}</Badge>
+                        <Badge key={s}>{tr(s)}</Badge>
                       ))}
                     </div>
                   )}
                 </div>
               </li>
             ))}
-            {busy && <li className="text-sm text-ink-muted">MedLens is thinking…</li>}
+            {busy && <li className="text-sm text-ink-muted">{tr("MedLens is thinking…")}</li>}
           </ul>
         )}
         <div ref={endRef} />
       </Card>
 
       <div className="sticky bottom-20 z-10 rounded-2xl border border-slate-200 bg-white p-3 shadow-card lg:bottom-4">
-        {rec.listening && <p className="mb-2 text-sm text-brand-800">Listening… {rec.interim}</p>}
+        {rec.listening && <p className="mb-2 text-sm text-brand-800">{tr("Listening…")} {rec.interim}</p>}
         {rec.error && <p className="mb-2 text-sm text-amber-900">{rec.error}</p>}
         <div className="flex items-center gap-2">
           {rec.supported && (
@@ -161,7 +166,7 @@ export default function AssistantPage() {
                 "grid h-14 w-14 shrink-0 place-items-center rounded-full text-white shadow",
                 rec.listening ? "animate-pulse bg-red-600" : "bg-brand-700 hover:bg-brand-800",
               )}
-              aria-label={rec.listening ? "Stop listening" : `Speak your question in ${language.name}`}
+              aria-label={rec.listening ? tr("Stop listening") : tr("Speak your question in {language}", { language: language.native })}
             >
               {rec.listening ? <MicOff className="h-7 w-7" /> : <Mic className="h-7 w-7" />}
             </button>
@@ -177,21 +182,21 @@ export default function AssistantPage() {
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Type your question…"
-                aria-label="Type your question"
+                placeholder={tr("Type your question…")}
+                aria-label={tr("Type your question")}
                 className="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-3 text-base"
                 lang={language.code}
                 dir={language.rtl ? "rtl" : undefined}
               />
-              <button type="submit" disabled={!input.trim() || busy} className={btn.primary} aria-label="Send">
+              <button type="submit" disabled={!input.trim() || busy} className={btn.primary} aria-label={tr("Send")}>
                 <Send className="h-5 w-5" />
               </button>
             </form>
           ) : (
             <div className="flex flex-1 items-center justify-between gap-2">
-              <p className="text-sm text-ink-soft">Tap the microphone and ask your question in {language.name}.</p>
+              <p className="text-sm text-ink-soft">{tr("Tap the microphone and ask your question in {language}.", { language: language.native })}</p>
               <button onClick={() => setTyping(true)} className={btn.ghost}>
-                <Keyboard className="h-4 w-4" /> Type instead
+                <Keyboard className="h-4 w-4" /> {tr("Type instead")}
               </button>
             </div>
           )}
@@ -202,13 +207,13 @@ export default function AssistantPage() {
             }}
             className="rounded-full p-2 text-ink-muted hover:bg-slate-100"
             aria-pressed={autoSpeak}
-            aria-label={autoSpeak ? "Turn off spoken answers" : "Turn on spoken answers"}
-            title={autoSpeak ? "Answers are read aloud" : "Answers are not read aloud"}
+            aria-label={autoSpeak ? tr("Turn off spoken answers") : tr("Turn on spoken answers")}
+            title={autoSpeak ? tr("Answers are read aloud") : tr("Answers are not read aloud")}
           >
             {autoSpeak ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
           </button>
         </div>
-        {!rec.supported && <p className="mt-2 text-xs text-ink-muted">Voice input isn&apos;t supported in this browser, so please type your question.</p>}
+        {!rec.supported && <p className="mt-2 text-xs text-ink-muted">{tr("Voice input isn't supported in this browser, so please type your question.")}</p>}
       </div>
     </div>
   );

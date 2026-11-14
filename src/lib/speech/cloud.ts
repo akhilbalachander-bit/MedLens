@@ -172,8 +172,8 @@ export class CloudSpeechEngine implements SpeechEngine {
 
   private handOff(rest: string, opts: SpeakOptions, reason: string | null, started = false) {
     this.usingFallback = true;
-    if (reason) opts.onNotice?.(`Online ${opts.lang.name} voice unavailable (${reason}). Using this device's voice instead.`);
-    else opts.onNotice?.(`Online ${opts.lang.name} voice is unavailable right now. Using this device's voice instead.`);
+    if (reason) console.warn(`Online voice unavailable: ${reason}`);
+    opts.onNotice?.("The online voice is unavailable right now. Using this device's voice instead.");
     this.fallback.speak(rest, { ...opts, onStart: started ? undefined : opts.onStart, voiceId: null });
   }
 

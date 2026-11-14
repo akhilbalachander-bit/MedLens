@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, Pill, Plus, ScanLine, Trash2, Wallet } from "lucide-react";
+import { useTr } from "@/lib/i18n";
 import { useMedLens } from "@/lib/store";
 import type { Medication } from "@/lib/schema";
 import { SpeakButton } from "@/components/speech/ListenControls";
@@ -20,6 +21,7 @@ const STATUS: Record<string, { label: string; tone: "blue" | "amber" | "red" | "
 
 export default function MedicationsPage() {
   const { analysis, hydrated, manualMeds, addManualMed, removeManualMed } = useMedLens();
+  const tr = useTr();
   const [form, setForm] = useState({ name: "", dose: "", notes: "" });
   const meds = analysis?.medications ?? [];
 
@@ -28,17 +30,17 @@ export default function MedicationsPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold text-ink">
-            <Pill className="h-7 w-7 text-brand-700" /> My Medications
+            <Pill className="h-7 w-7 text-brand-700" /> {tr("My Medications")}
           </h1>
-          <p className="mt-1 text-ink-soft">Medicines from your scanned paperwork, explained simply.</p>
+          <p className="mt-1 text-ink-soft">{tr("Medicines from your scanned paperwork, explained simply.")}</p>
         </div>
         <div className="flex gap-2">
           <Link href="/scan?mode=camera" className={btn.secondary}>
-            <ScanLine className="h-4 w-4" /> Scan a label
+            <ScanLine className="h-4 w-4" /> {tr("Scan a label")}
           </Link>
           {meds.length > 0 && (
             <Link href="/results?tab=wallet" className={btn.secondary}>
-              <Wallet className="h-4 w-4" /> Savings
+              <Wallet className="h-4 w-4" /> {tr("Savings")}
             </Link>
           )}
         </div>
@@ -48,15 +50,15 @@ export default function MedicationsPage() {
 
       {hydrated && !analysis && (
         <Card>
-          <p className="mb-3 text-ink-soft">Scan a prescription bottle or your discharge papers to see your medications here.</p>
+          <p className="mb-3 text-ink-soft">{tr("Scan a prescription bottle or your discharge papers to see your medications here.")}</p>
           <ScanFlow variant="compact" />
         </Card>
       )}
-      {analysis && meds.length === 0 && <Notice tone="info">No medications were found in your scanned document.</Notice>}
+      {analysis && meds.length === 0 && <Notice tone="info">{tr("No medications were found in your scanned document.")}</Notice>}
 
       {meds.length > 0 && (
         <Notice tone="warning" icon={<AlertTriangle className="h-5 w-5" />}>
-          Always follow the label on your medicine and your pharmacist&apos;s directions. Do not start, stop or change a medicine based on this app.
+          {tr("Always follow the label on your medicine and your pharmacist's directions. Do not start, stop or change a medicine based on this app.")}
         </Notice>
       )}
 
@@ -67,9 +69,9 @@ export default function MedicationsPage() {
       </ul>
 
       <Card>
-        <SectionTitle icon={<Plus className="h-5 w-5" />}>Other medicines you take</SectionTitle>
+        <SectionTitle icon={<Plus className="h-5 w-5" />}>{tr("Other medicines you take")}</SectionTitle>
         <p className="mb-3 text-sm text-ink-soft">
-          Add medicines that are not on this document so you can show a full list to your doctor or pharmacist. Saved only in this browser session.
+          {tr("Add medicines that are not on this document so you can show a full list to your doctor or pharmacist. Saved only in this browser session.")}
         </p>
         {manualMeds.length > 0 && (
           <ul className="mb-3 divide-y divide-slate-100 rounded-xl border border-slate-200">
@@ -81,7 +83,7 @@ export default function MedicationsPage() {
                   </p>
                   {m.notes && <p className="text-sm text-ink-soft">{m.notes}</p>}
                 </div>
-                <button onClick={() => removeManualMed(m.id)} className="rounded p-1.5 text-red-700 hover:bg-red-50" aria-label={`Remove ${m.name}`}>
+                <button onClick={() => removeManualMed(m.id)} className="rounded p-1.5 text-red-700 hover:bg-red-50" aria-label={tr("Remove {name}", { name: m.name })}>
                   <Trash2 className="h-4 w-4" />
                 </button>
               </li>
@@ -97,11 +99,11 @@ export default function MedicationsPage() {
             setForm({ name: "", dose: "", notes: "" });
           }}
         >
-          <input aria-label="Medicine name" placeholder="Medicine name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="rounded-lg border border-slate-300 px-3 py-2" required />
-          <input aria-label="Dose" placeholder="Dose (e.g. 10 mg daily)" value={form.dose} onChange={(e) => setForm({ ...form, dose: e.target.value })} className="rounded-lg border border-slate-300 px-3 py-2" />
-          <input aria-label="Notes" placeholder="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="rounded-lg border border-slate-300 px-3 py-2" />
+          <input aria-label={tr("Medicine name")} placeholder={tr("Medicine name")} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="rounded-lg border border-slate-300 px-3 py-2" required />
+          <input aria-label={tr("Dose")} placeholder={tr("Dose (e.g. 10 mg daily)")} value={form.dose} onChange={(e) => setForm({ ...form, dose: e.target.value })} className="rounded-lg border border-slate-300 px-3 py-2" />
+          <input aria-label={tr("Notes")} placeholder={tr("Notes")} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="rounded-lg border border-slate-300 px-3 py-2" />
           <button className={btn.primary} type="submit">
-            Add
+            {tr("Add")}
           </button>
         </form>
       </Card>
@@ -111,6 +113,7 @@ export default function MedicationsPage() {
 
 function MedCard({ m }: { m: Medication }) {
   const { t, medVerified, setMedVerified } = useMedLens();
+  const tr = useTr();
   const verified = !!medVerified[m.id!];
   const na = <Unavailable label={t("ui.notInDoc")} />;
   const simple = t(`med.${m.id}.simple`, m.instructions_simple);
@@ -126,10 +129,10 @@ function MedCard({ m }: { m: Medication }) {
               {m.name} {m.strength && <span className="font-semibold text-ink-soft">{m.strength}</span>}
             </h2>
             <div className="mt-1 flex flex-wrap gap-2">
-              {st && <Badge tone={st.tone}>{st.label}</Badge>}
-              {m.brand_name && m.brand_name !== m.name && <Badge>Brand: {m.brand_name}</Badge>}
-              {m.generic_name && m.generic_name.toLowerCase() !== m.name.toLowerCase() && <Badge>Generic: {m.generic_name}</Badge>}
-              <Badge tone={m.confidence === "high" ? "green" : m.confidence === "low" ? "red" : "amber"}>Read confidence: {m.confidence}</Badge>
+              {st && <Badge tone={st.tone}>{tr(st.label)}</Badge>}
+              {m.brand_name && m.brand_name !== m.name && <Badge>{tr("Brand:")} {m.brand_name}</Badge>}
+              {m.generic_name && m.generic_name.toLowerCase() !== m.name.toLowerCase() && <Badge>{tr("Generic:")} {m.generic_name}</Badge>}
+              <Badge tone={m.confidence === "high" ? "green" : m.confidence === "low" ? "red" : "amber"}>{tr(m.confidence === "high" ? "Read confidence: high" : m.confidence === "low" ? "Read confidence: low" : "Read confidence: medium")}</Badge>
             </div>
           </div>
           <SpeakButton req={{ id: `medcard-${m.id}`, label: m.name, text: speech }} />
@@ -139,12 +142,12 @@ function MedCard({ m }: { m: Medication }) {
           <div className={cx("mt-3 rounded-xl border p-3 text-sm", verified ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-amber-300 bg-amber-50 text-amber-950")}>
             <p className="flex items-center gap-2 font-semibold">
               {verified ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-              {verified ? "You marked this as checked" : "Please verify this medication"}
+              {tr(verified ? "You marked this as checked" : "Please verify this medication")}
             </p>
             {m.verification_reason && <Localized as="p" className="mt-1">{t(`med.${m.id}.verify`, m.verification_reason)}</Localized>}
             <label className="mt-2 flex items-center gap-2">
               <input type="checkbox" checked={verified} onChange={(e) => setMedVerified(m.id!, e.target.checked)} className="h-5 w-5 accent-brand-700" />
-              I checked this with my pharmacist or doctor
+              {tr("I checked this with my pharmacist or doctor")}
             </label>
           </div>
         )}
@@ -158,13 +161,13 @@ function MedCard({ m }: { m: Medication }) {
         <dl className="mt-3 grid gap-x-6 gap-y-1.5 text-[15px] sm:grid-cols-2">
           {(
             [
-              ["What it's for", purpose || na],
-              ["Dose", m.dose ?? na],
-              ["How", m.route ?? na],
-              ["How often", m.frequency ?? na],
-              ["How long", m.duration ?? na],
-              ["Quantity", m.quantity ?? na],
-              ["Refills", m.refills ?? na],
+              [tr("What it's for"), purpose || na],
+              [tr("Dose"), m.dose ? t(`med.${m.id}.dose`, m.dose) : na],
+              [tr("How"), m.route ? t(`med.${m.id}.route`, m.route) : na],
+              [tr("How often"), m.frequency ? t(`med.${m.id}.frequency`, m.frequency) : na],
+              [tr("How long"), m.duration ? t(`med.${m.id}.duration`, m.duration) : na],
+              [tr("Quantity"), m.quantity ? t(`med.${m.id}.quantity`, m.quantity) : na],
+              [tr("Refills"), m.refills ?? na],
             ] as const
           ).map(([k, v]) => (
             <div key={k} className="grid grid-cols-[7.5rem_1fr] gap-2">

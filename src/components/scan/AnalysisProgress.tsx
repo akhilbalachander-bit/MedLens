@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Check, Loader2 } from "lucide-react";
 import { cx } from "../ui";
+import { useTr } from "@/lib/i18n";
 
 export const DOCUMENT_STAGES = [
   "Uploading your document securely",
@@ -28,6 +29,12 @@ export const BILL_STAGES = [
  */
 export function AnalysisProgress({ stages = DOCUMENT_STAGES, done, onCancel, stepMs = 2600 }: { stages?: string[]; done?: boolean; onCancel?: () => void; stepMs?: number }) {
   const [step, setStep] = useState(0);
+  const [slow, setSlow] = useState(false);
+  const tr = useTr();
+  useEffect(() => {
+    const id = setTimeout(() => setSlow(true), 45_000);
+    return () => clearTimeout(id);
+  }, []);
   useEffect(() => {
     if (done) {
       setStep(stages.length);
@@ -43,8 +50,12 @@ export function AnalysisProgress({ stages = DOCUMENT_STAGES, done, onCancel, ste
       <div className="flex items-center gap-3">
         <Loader2 className={cx("h-7 w-7 text-brand-700", !done && "animate-spin")} aria-hidden />
         <div>
-          <p className="text-lg font-bold text-ink">{done ? "Done!" : "Analyzing your document…"}</p>
-          <p className="text-sm text-ink-muted">This usually takes 10–30 seconds.</p>
+          <p className="text-lg font-bold text-ink">{done ? tr("Done!") : tr("Analyzing your document…")}</p>
+          <p className="text-sm text-ink-muted">
+            {slow
+              ? tr("Still working. Long documents and busy times can take a minute or two — please keep this page open.")
+              : tr("This usually takes 20–60 seconds.")}
+          </p>
         </div>
       </div>
       <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-slate-100" aria-hidden>
@@ -63,14 +74,14 @@ export function AnalysisProgress({ stages = DOCUMENT_STAGES, done, onCancel, ste
               >
                 {state === "done" ? <Check className="h-4 w-4" /> : state === "active" ? <span className="h-2 w-2 animate-pulse rounded-full bg-brand-600" /> : null}
               </span>
-              {s}
+              {tr(s)}
             </li>
           );
         })}
       </ol>
       {onCancel && !done && (
         <button onClick={onCancel} className="mt-4 text-sm font-medium text-ink-muted underline hover:text-ink">
-          Cancel
+          {tr("Cancel")}
         </button>
       )}
     </div>
