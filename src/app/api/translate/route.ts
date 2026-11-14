@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { AIError, generateJson, getProviderConfig } from "@/lib/ai/provider";
 import { TRANSLATE_SYSTEM, translatePrompt } from "@/lib/ai/prompts";
+import { checkRateLimit } from "@/lib/server/rate-limit";
 import { errorResponse } from "@/lib/server/uploads";
 
 export const runtime = "nodejs";
@@ -21,6 +22,7 @@ const CHUNK = 60;
  */
 export async function POST(req: Request) {
   try {
+    checkRateLimit(req, "translate");
     const parsed = Body.safeParse(await req.json().catch(() => null));
     if (!parsed.success) throw new AIError("unsupported_file", "Invalid translation request.", 400);
     const { language, entries } = parsed.data;

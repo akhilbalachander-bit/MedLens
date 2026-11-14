@@ -1,6 +1,6 @@
 "use client";
 
-import { Pause, Play, RotateCcw, Square, Volume2, Gauge, AlertTriangle } from "lucide-react";
+import { Pause, Play, RotateCcw, Square, Volume2, Gauge, AlertTriangle, Loader2, Sparkles } from "lucide-react";
 import { useMedLens } from "@/lib/store";
 import { cx } from "../ui";
 import { useSpeech, type SpeakRequest } from "./SpeechContext";
@@ -11,6 +11,7 @@ export function SpeakButton({ req, label = "Listen", className }: { req: SpeakRe
   const isMe = s.currentId === req.id;
   const playing = isMe && s.status === "speaking";
   const paused = isMe && s.status === "paused";
+  const loading = isMe && s.status === "loading";
   if (!req.text.trim()) return null;
   return (
     <button
@@ -21,11 +22,12 @@ export function SpeakButton({ req, label = "Listen", className }: { req: SpeakRe
         playing ? "border-brand-600 bg-brand-700 text-white" : "border-brand-200 bg-brand-50 text-brand-800 hover:bg-brand-100",
         className,
       )}
-      aria-label={`${playing ? "Pause" : paused ? "Resume" : label}: ${req.label}`}
+      aria-label={`${loading ? "Cancel" : playing ? "Pause" : paused ? "Resume" : label}: ${req.label}`}
       aria-pressed={playing}
+      aria-busy={loading}
     >
-      {playing ? <Pause className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-      <span>{playing ? "Pause" : paused ? "Resume" : label}</span>
+      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : playing ? <Pause className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+      <span>{loading ? "Loading…" : playing ? "Pause" : paused ? "Resume" : label}</span>
     </button>
   );
 }
@@ -38,7 +40,7 @@ export function ListenBar({ full, className, sticky = true }: { full: SpeakReque
   const s = useSpeech();
   const { prefs, setPrefs, language } = useMedLens();
   const active = s.status !== "idle";
-  const noVoice = s.supported && s.voices.length > 0 && s.languageVoices.length === 0;
+  const noVoice = !s.cloud && s.supported && s.voices.length > 0 && s.languageVoices.length === 0;
 
   return (
     <div
@@ -58,12 +60,29 @@ export function ListenBar({ full, className, sticky = true }: { full: SpeakReque
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <button
             type="button"
-            onClick={() => (active ? (s.status === "speaking" ? s.pause() : s.resume()) : s.speak(full))}
+            onClick={() =>
+              s.status === "loading" ? s.stop() : active ? (s.status === "speaking" ? s.pause() : s.resume()) : s.speak(full)
+            }
             className="inline-flex min-h-[56px] items-center justify-center gap-3 rounded-2xl bg-brand-700 px-5 text-lg font-bold text-white shadow hover:bg-brand-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
-            aria-label={s.status === "speaking" ? "Pause reading" : s.status === "paused" ? "Resume reading" : `Listen to ${full.label}`}
+            aria-label={
+              s.status === "loading"
+                ? "Cancel"
+                : s.status === "speaking"
+                  ? "Pause reading"
+                  : s.status === "paused"
+                    ? "Resume reading"
+                    : `Listen to ${full.label}`
+            }
+            aria-busy={s.status === "loading"}
           >
-            {s.status === "speaking" ? <Pause className="h-7 w-7" /> : <Play className="h-7 w-7" />}
-            {s.status === "speaking" ? "Pause" : s.status === "paused" ? "Resume" : "Listen to everything"}
+            {s.status === "loading" ? (
+              <Loader2 className="h-7 w-7 animate-spin" />
+            ) : s.status === "speaking" ? (
+              <Pause className="h-7 w-7" />
+            ) : (
+              <Play className="h-7 w-7" />
+            )}
+            {s.status === "loading" ? "Preparing voice…" : s.status === "speaking" ? "Pause" : s.status === "paused" ? "Resume" : "Listen to everything"}
           </button>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -87,6 +106,11 @@ export function ListenBar({ full, className, sticky = true }: { full: SpeakReque
                 </button>
               ))}
             </div>
+            {s.cloud ? (
+              <span className="inline-flex items-center gap-1 rounded-xl bg-brand-50 px-3 py-2 text-sm font-medium text-brand-800" title="Natural online voice">
+                <Sparkles className="h-4 w-4" aria-hidden /> Natural {language.name} voice
+              </span>
+            ) : (
             <label className="flex items-center gap-1 text-sm">
               <span className="sr-only">Voice</span>
               <select
@@ -103,12 +127,13 @@ export function ListenBar({ full, className, sticky = true }: { full: SpeakReque
                 ))}
               </select>
             </label>
+            )}
           </div>
         </div>
       )}
       {active && s.currentLabel && (
         <p className="mt-2 text-sm text-brand-800" aria-live="polite">
-          {s.status === "paused" ? "Paused" : "Reading"}: {s.currentLabel}
+          {s.status === "paused" ? "Paused" : s.status === "loading" ? "Preparing" : "Reading"}: {s.currentLabel}
         </p>
       )}
       {noVoice && (
@@ -118,6 +143,7 @@ export function ListenBar({ full, className, sticky = true }: { full: SpeakReque
           different voice or not pronounce it correctly. You can add voices in your device&apos;s language/speech settings, or try Chrome or Edge.
         </p>
       )}
+      {s.notice && <p className="mt-2 text-sm text-amber-900">{s.notice}</p>}
       {s.error && <p className="mt-2 text-sm text-red-700">{s.error}</p>}
     </div>
   );

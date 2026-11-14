@@ -1,9 +1,9 @@
 import type { Language } from "../languages";
 
 /**
- * Speech engine abstraction. The app only talks to this interface, so the
- * browser implementation can later be swapped for a cloud TTS provider
- * (set NEXT_PUBLIC_SPEECH_PROVIDER and add an engine here).
+ * Speech engine abstraction. Two implementations: the device's own voices
+ * (Web Speech API, below) and natural online voices (CloudSpeechEngine in
+ * ./cloud), which falls back to the device engine when needed.
  */
 export type SpeechVoice = { id: string; name: string; lang: string; local: boolean };
 
@@ -14,6 +14,8 @@ export type SpeakOptions = {
   onStart?: () => void;
   onEnd?: () => void;
   onError?: (message: string) => void;
+  /** Non-fatal information, e.g. falling back to a device voice. */
+  onNotice?: (message: string) => void;
 };
 
 export interface SpeechEngine {
@@ -138,10 +140,5 @@ export class BrowserSpeechEngine implements SpeechEngine {
 }
 
 export function createSpeechEngine(): SpeechEngine {
-  const kind = process.env.NEXT_PUBLIC_SPEECH_PROVIDER || "browser";
-  switch (kind) {
-    case "browser":
-    default:
-      return new BrowserSpeechEngine();
-  }
+  return new BrowserSpeechEngine();
 }

@@ -25,9 +25,18 @@ export type Prefs = {
   voiceByLang: Record<string, string>;
   textSize: "normal" | "large";
   customLanguages: Language[];
+  /** "auto" uses natural online voices when the server has one configured. */
+  voiceSource?: "auto" | "device";
 };
 export type TranslationState = { status: "idle" | "loading" | "ready" | "error" | "unavailable"; message?: string };
-export type ProviderStatus = { configured: boolean; provider: string | null; model: string | null; maxFileMb: number; maxFiles: number };
+export type ProviderStatus = {
+  configured: boolean;
+  provider: string | null;
+  model: string | null;
+  maxFileMb: number;
+  maxFiles: number;
+  tts?: { provider: string } | null;
+};
 
 const DEFAULT_PREFS: Prefs = { language: "en", speechRate: "normal", voiceByLang: {}, textSize: "normal", customLanguages: [] };
 
