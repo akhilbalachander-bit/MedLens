@@ -1,6 +1,7 @@
 import { AIError, generateJson, getProviderConfig } from "@/lib/ai/provider";
 import { ANALYSIS_SYSTEM, analysisPrompt } from "@/lib/ai/prompts";
 import { AnalysisSchema, normalizeAnalysis, type AnalysisResult } from "@/lib/schema";
+import { checkRateLimit } from "@/lib/server/rate-limit";
 import { errorResponse, readUploads } from "@/lib/server/uploads";
 import { sampleResult } from "@/lib/sample/discharge";
 
@@ -16,6 +17,7 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(req: Request) {
   try {
+    checkRateLimit(req, "analyze");
     const cfg = getProviderConfig();
     const form = await req.formData().catch(() => {
       throw new AIError("unsupported_file", "Upload could not be read. Please try again.", 400);

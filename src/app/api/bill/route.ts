@@ -1,6 +1,7 @@
 import { AIError, generateJson, getProviderConfig } from "@/lib/ai/provider";
 import { BILL_SYSTEM, billPrompt } from "@/lib/ai/prompts";
 import { BillAnalysisSchema, normalizeBill, type BillAnalysisResult } from "@/lib/bill-schema";
+import { checkRateLimit } from "@/lib/server/rate-limit";
 import { errorResponse, readUploads } from "@/lib/server/uploads";
 import { sampleBillResult } from "@/lib/sample/bill";
 
@@ -11,6 +12,7 @@ export const dynamic = "force-dynamic";
 /** Hospital Bill Auditor: one vision call per uploaded bill. Not stored. */
 export async function POST(req: Request) {
   try {
+    checkRateLimit(req, "bill");
     const cfg = getProviderConfig();
     const form = await req.formData().catch(() => {
       throw new AIError("unsupported_file", "Upload could not be read. Please try again.", 400);

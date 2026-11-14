@@ -1,15 +1,21 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { createSpeechEngine, voicesForLanguage, type SpeechEngine, type SpeechVoice } from "@/lib/speech/engine";
+import { BrowserSpeechEngine, voicesForLanguage, type SpeechEngine, type SpeechVoice } from "@/lib/speech/engine";
+import { CloudSpeechEngine } from "@/lib/speech/cloud";
 import { useMedLens } from "@/lib/store";
 import type { Language } from "@/lib/languages";
 
 export type SpeakRequest = { id: string; label: string; text: string; lang?: Language };
-type Status = "idle" | "speaking" | "paused";
+type Status = "idle" | "loading" | "speaking" | "paused";
 
 type SpeechCtx = {
   supported: boolean;
+  /** true when natural online voices are being used */
+  cloud: boolean;
+  /** true when the server offers online voices (whether or not the user chose them) */
+  cloudAvailable: boolean;
+  notice: string | null;
   status: Status;
   currentId: string | null;
   currentLabel: string | null;
@@ -31,8 +37,13 @@ type SpeechCtx = {
 const Ctx = createContext<SpeechCtx | null>(null);
 
 export function SpeechProvider({ children }: { children: React.ReactNode }) {
-  const { language, prefs, setPrefs } = useMedLens();
+  const { language, prefs, setPrefs, provider } = useMedLens();
+  const deviceRef = useRef<BrowserSpeechEngine | null>(null);
+  const cloudRef = useRef<CloudSpeechEngine | null>(null);
   const engineRef = useRef<SpeechEngine | null>(null);
+  const cloudAvailable = !!provider?.tts;
+  const cloud = cloudAvailable && prefs.voiceSource !== "device";
+  const [notice, setNotice] = useState<string | null>(null);
   const [supported, setSupported] = useState(false);
   const [voices, setVoices] = useState<SpeechVoice[]>([]);
   const [status, setStatus] = useState<Status>("idle");
@@ -41,17 +52,31 @@ export function SpeechProvider({ children }: { children: React.ReactNode }) {
   const last = useRef<SpeakRequest | null>(null);
 
   useEffect(() => {
-    const engine = createSpeechEngine();
-    engineRef.current = engine;
-    setSupported(engine.isSupported());
-    const load = () => setVoices(engine.getVoices());
+    const device = new BrowserSpeechEngine();
+    deviceRef.current = device;
+    cloudRef.current = new CloudSpeechEngine(device);
+    engineRef.current = device;
+    setSupported(device.isSupported());
+    const load = () => setVoices(device.getVoices());
     load();
-    const off = engine.onVoicesChanged(load);
+    const off = device.onVoicesChanged(load);
     return () => {
       off();
-      engine.cancel();
+      cloudRef.current?.cancel();
+      device.cancel();
     };
   }, []);
+
+  // Switch engine when online voices become available or the user changes source.
+  useEffect(() => {
+    const next = cloud ? cloudRef.current : deviceRef.current;
+    if (!next || next === engineRef.current) return;
+    engineRef.current?.cancel();
+    engineRef.current = next;
+    setSupported(next.isSupported());
+    setStatus("idle");
+    setCurrent(null);
+  }, [cloud]);
 
   // Stop speaking when the language changes (text would no longer match).
   useEffect(() => {
@@ -74,13 +99,16 @@ export function SpeechProvider({ children }: { children: React.ReactNode }) {
       const lang = req.lang ?? language;
       const voiceId = lang.code === language.code ? selectedVoiceId : null;
       setError(null);
+      setNotice(null);
       last.current = req;
       setCurrent(req);
+      setStatus("loading");
       engine.speak(req.text, {
         lang,
         voiceId,
         rate: prefs.speechRate === "slow" ? 0.72 : 1,
         onStart: () => setStatus("speaking"),
+        onNotice: (m) => setNotice(m),
         onEnd: () => {
           setStatus("idle");
           setCurrent(null);
@@ -111,6 +139,9 @@ export function SpeechProvider({ children }: { children: React.ReactNode }) {
 
   const value: SpeechCtx = {
     supported,
+    cloud,
+    cloudAvailable,
+    notice,
     status,
     currentId: current?.id ?? null,
     currentLabel: current?.label ?? null,
@@ -122,7 +153,8 @@ export function SpeechProvider({ children }: { children: React.ReactNode }) {
     speak,
     toggle: (req) => {
       if (current?.id === req.id) {
-        if (status === "speaking") pause();
+        if (status === "loading") stop();
+        else if (status === "speaking") pause();
         else if (status === "paused") resume();
         else speak(req);
       } else speak(req);

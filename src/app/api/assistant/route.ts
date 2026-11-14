@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { AIError, generateJson, getProviderConfig } from "@/lib/ai/provider";
 import { ASSISTANT_SYSTEM } from "@/lib/ai/prompts";
+import { checkRateLimit } from "@/lib/server/rate-limit";
 import { errorResponse } from "@/lib/server/uploads";
 import { detectEmergency } from "@/lib/emergency";
 
@@ -20,6 +21,7 @@ const Body = z.object({
 
 export async function POST(req: Request) {
   try {
+    checkRateLimit(req, "assistant");
     const parsed = Body.safeParse(await req.json().catch(() => null));
     if (!parsed.success) throw new AIError("unsupported_file", "Invalid question.", 400);
     const { question, language, context, history } = parsed.data;

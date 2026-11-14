@@ -23,6 +23,23 @@ const TEST_PHRASE: Record<string, string> = {
   ar: "هكذا سيقرأ MedLens تعليماتك.",
   fr: "Voici comment MedLens lira vos instructions.",
   pt: "É assim que o MedLens vai ler suas instruções.",
+  bn: "MedLens এভাবেই আপনার নির্দেশাবলী পড়ে শোনাবে।",
+  mr: "MedLens तुमच्या सूचना अशा प्रकारे वाचेल.",
+  gu: "MedLens તમારી સૂચનાઓ આ રીતે વાંચશે.",
+  pa: "MedLens ਤੁਹਾਡੀਆਂ ਹਦਾਇਤਾਂ ਇਸ ਤਰ੍ਹਾਂ ਪੜ੍ਹੇਗਾ।",
+  kn: "MedLens ನಿಮ್ಮ ಸೂಚನೆಗಳನ್ನು ಹೀಗೆ ಓದುತ್ತದೆ.",
+  ml: "MedLens നിങ്ങളുടെ നിർദ്ദേശങ്ങൾ ഇങ്ങനെ വായിക്കും.",
+  ur: "MedLens آپ کی ہدایات اس طرح پڑھے گا۔",
+  th: "นี่คือวิธีที่ MedLens จะอ่านคำแนะนำของคุณ",
+  id: "Beginilah MedLens akan membacakan petunjuk Anda.",
+  fa: "MedLens دستورالعمل‌های شما را این‌گونه می‌خواند.",
+  de: "So liest MedLens Ihre Anweisungen vor.",
+  it: "Ecco come MedLens leggerà le tue istruzioni.",
+  ru: "Вот так MedLens будет читать ваши инструкции.",
+  uk: "Ось так MedLens читатиме ваші інструкції.",
+  pl: "Tak MedLens będzie czytać Twoje instrukcje.",
+  tr: "MedLens talimatlarınızı bu şekilde okuyacak.",
+  ht: "Se konsa MedLens ap li enstriksyon ou yo.",
 };
 
 export default function SettingsPage() {
@@ -65,6 +82,36 @@ export default function SettingsPage() {
                 ))}
               </div>
             </div>
+            <div>
+              <span className="mb-1 block text-sm font-medium text-ink">Voice source</span>
+              <div className="inline-flex overflow-hidden rounded-xl border border-slate-300" role="group" aria-label="Voice source">
+                {(
+                  [
+                    ["auto", "Natural online voice"],
+                    ["device", "This device's voices"],
+                  ] as const
+                ).map(([v, label]) => (
+                  <button
+                    key={v}
+                    onClick={() => setPrefs({ voiceSource: v })}
+                    disabled={v === "auto" && !speech.cloudAvailable}
+                    aria-pressed={(prefs.voiceSource ?? "auto") === v && (v === "device" || speech.cloudAvailable)}
+                    className={cx(
+                      "px-4 py-2 text-sm font-medium disabled:opacity-40",
+                      (v === "auto" ? speech.cloud : !speech.cloud) ? "bg-brand-700 text-white" : "hover:bg-slate-50",
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1 text-xs text-ink-muted">
+                {speech.cloudAvailable
+                  ? "Natural voices work in every language, even if your phone has none installed. The text being read is sent to the voice service; your document image is not."
+                  : "Natural online voices are not set up on this server, so your device's own voices are used."}
+              </p>
+            </div>
+            {!speech.cloud && (
             <label className="block text-sm">
               <span className="mb-1 block font-medium text-ink">Voice for {language.name}</span>
               <select value={speech.selectedVoiceId ?? ""} onChange={(e) => speech.setVoice(e.target.value || null)} className="w-full max-w-md rounded-xl border border-slate-300 px-3 py-2">
@@ -76,11 +123,15 @@ export default function SettingsPage() {
                 ))}
               </select>
             </label>
+            )}
             <button className={btn.secondary} onClick={() => speech.speak({ id: "test", label: "Voice test", text: TEST_PHRASE[language.code] ?? TEST_PHRASE.en })}>
               <Volume2 className="h-4 w-4" /> Test voice
             </button>
+            {speech.status === "loading" && <p className="text-sm text-brand-800">Preparing voice…</p>}
+            {speech.notice && <p className="text-sm text-amber-900">{speech.notice}</p>}
+            {speech.error && <p className="text-sm text-red-700">{speech.error}</p>}
             <details className="rounded-xl bg-slate-50 p-3">
-              <summary className="cursor-pointer text-sm font-semibold text-ink">Voice availability on this device</summary>
+              <summary className="cursor-pointer text-sm font-semibold text-ink">Voices installed on this device</summary>
               <p className="mt-2 text-xs text-ink-muted">
                 Voices come from your browser and operating system, so they differ between devices. You can usually add more in your device&apos;s
                 language or text-to-speech settings.
