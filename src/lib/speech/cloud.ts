@@ -1,5 +1,5 @@
 import type { Language } from "../languages";
-import { chunkText, type SpeakOptions, type SpeechEngine, type SpeechVoice } from "./engine";
+import { chunkText, voicesForLanguage, type SpeakOptions, type SpeechEngine, type SpeechVoice } from "./engine";
 
 /** Locale sent to the cloud voice service. */
 export function ttsLocale(lang: Language): string {
@@ -10,7 +10,7 @@ export function ttsLocale(lang: Language): string {
  * Group sentences into fewer, larger requests. The first group stays short so
  * audio starts quickly; later ones are fetched while earlier ones play.
  */
-export function packChunks(sentences: string[], first = 160, rest = 600): string[] {
+export function packChunks(sentences: string[], first = 220, rest = 1200): string[] {
   const out: string[] = [];
   let cur = "";
   for (const s of sentences) {
@@ -90,17 +90,31 @@ export class CloudSpeechEngine implements SpeechEngine {
     const key = `${locale}\u0000${text}`;
     const hit = this.cache.get(key);
     if (hit) return hit;
-    const p = fetch("/api/tts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, locale, languageName: lang.name }),
-    }).then(async (res) => {
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        throw Object.assign(new Error(body?.error?.message ?? `Voice service error ${res.status}`), { status: res.status });
+    const once = () =>
+      fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, locale, languageName: lang.name }),
+      }).then(async (res) => {
+        if (!res.ok) {
+          const body = await res.json().catch(() => null);
+          throw Object.assign(new Error(body?.error?.message ?? `Voice service error ${res.status}`), { status: res.status });
+        }
+        return URL.createObjectURL(await res.blob());
+      });
+    // Busy or rate-limited: wait and try again (twice) before giving up.
+    const p = (async () => {
+      for (let attempt = 0; ; attempt++) {
+        try {
+          return await once();
+        } catch (e) {
+          const status = (e as { status?: number }).status ?? 0;
+          const retryable = status === 0 || status === 429 || status >= 500;
+          if (!retryable || attempt >= 2) throw e;
+          await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
+        }
       }
-      return URL.createObjectURL(await res.blob());
-    });
+    })();
     p.catch(() => this.cache.delete(key));
     this.cache.set(key, p);
     if (this.cache.size > 80) {
@@ -118,8 +132,9 @@ export class CloudSpeechEngine implements SpeechEngine {
     const chunks = packChunks(chunkText(text, 400));
     const audio = this.el();
 
+    // Only a language the voice service rejected outright is skipped for a while.
     const failedAt = this.failedLocales.get(locale);
-    if (failedAt && Date.now() - failedAt < 5 * 60_000) {
+    if (failedAt && Date.now() - failedAt < 10 * 60_000) {
       this.handOff(chunks.join(" "), opts, null);
       return;
     }
@@ -142,7 +157,7 @@ export class CloudSpeechEngine implements SpeechEngine {
       } catch (e) {
         if (my !== this.token) return;
         const status = (e as { status?: number }).status;
-        if (status !== 429) this.failedLocales.set(locale, Date.now());
+        if (status === 400) this.failedLocales.set(locale, Date.now());
         this.handOff(chunks.slice(i).join(" "), opts, (e as Error).message, started);
         return;
       }
@@ -171,8 +186,14 @@ export class CloudSpeechEngine implements SpeechEngine {
   }
 
   private handOff(rest: string, opts: SpeakOptions, reason: string | null, started = false) {
-    this.usingFallback = true;
     if (reason) console.warn(`Online voice unavailable: ${reason}`);
+    // Never read a language with a voice that does not speak it (that sounds
+    // like English): only fall back when this device has a matching voice.
+    if (!voicesForLanguage(this.fallback.getVoices(), opts.lang).length) {
+      opts.onError?.("The natural voice is busy right now. Please tap Listen again in a moment.");
+      return;
+    }
+    this.usingFallback = true;
     opts.onNotice?.("The online voice is unavailable right now. Using this device's voice instead.");
     this.fallback.speak(rest, { ...opts, onStart: started ? undefined : opts.onStart, voiceId: null });
   }

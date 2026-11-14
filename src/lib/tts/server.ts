@@ -29,7 +29,7 @@ export function getTtsConfig(): TtsConfig | null {
     googleKey ? { provider: "google", apiKey: googleKey, model: null, voice: env.GOOGLE_TTS_VOICE?.trim() ?? "Chirp3-HD-Kore", baseUrl: null } : null;
   const gemini = (): TtsConfig | null =>
     geminiKey
-      ? { provider: "gemini", apiKey: geminiKey, model: env.GEMINI_TTS_MODEL?.trim() || workingGeminiModel || GEMINI_TTS_MODELS[0], voice: env.GEMINI_TTS_VOICE?.trim() || "Kore", baseUrl: null }
+      ? { provider: "gemini", apiKey: geminiKey, model: env.GEMINI_TTS_MODEL?.trim() || workingGeminiModel || GEMINI_TTS_MODELS[0], voice: env.GEMINI_TTS_VOICE?.trim() || "Sulafat", baseUrl: null }
       : null;
   const openai = (): TtsConfig | null =>
     openaiKey
@@ -44,7 +44,14 @@ export function getTtsConfig(): TtsConfig | null {
 
 /** Tried in order when a model is not found (names change between releases). */
 let workingGeminiModel: string | null = null;
-export const GEMINI_TTS_MODELS = ["gemini-3.8-flash-tts", "gemini-3.8-flash-lite-tts", "gemini-2.5-flash-preview-tts"];
+/** For tests. */
+export function resetTtsState() {
+  workingGeminiModel = null;
+  ttsModelList = null;
+  cache.clear();
+  cacheBytes = 0;
+}
+export const GEMINI_TTS_MODELS = ["gemini-3.8-flash-tts", "gemini-3.8-flash-lite-tts"];
 
 export type Synthesized = { audio: Buffer; mimeType: string };
 
@@ -62,7 +69,7 @@ export async function synthesize(cfg: TtsConfig, text: string, locale: string, l
     return hit;
   }
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 45_000);
+  const timer = setTimeout(() => controller.abort(), 55_000);
   let out: Synthesized;
   try {
     out =
@@ -91,7 +98,7 @@ export async function synthesize(cfg: TtsConfig, text: string, locale: string, l
 async function failure(res: Response, who: string): Promise<never> {
   const body = await res.json().catch(() => null);
   const msg = body?.error?.message ?? res.statusText;
-  throw new AIError("provider_error", `${who} voice error (${res.status}): ${msg}`, res.status === 429 ? 429 : 502);
+  throw new AIError("provider_error", `${who} voice error (${res.status}): ${msg}`, res.status === 429 ? 429 : res.status === 503 ? 503 : 502);
 }
 
 async function googleTts(cfg: TtsConfig, text: string, locale: string, signal: AbortSignal): Promise<Synthesized> {
@@ -112,28 +119,88 @@ async function googleTts(cfg: TtsConfig, text: string, locale: string, signal: A
   return { audio: Buffer.from(body.audioContent, "base64"), mimeType: "audio/mpeg" };
 }
 
+/** Voice-capable Gemini models this key can use, best first (cached for an hour). */
+let ttsModelList: { at: number; ids: string[] } | null = null;
+export async function listGeminiTtsModels(apiKey: string, signal?: AbortSignal): Promise<string[]> {
+  if (ttsModelList && Date.now() - ttsModelList.at < 60 * 60_000) return ttsModelList.ids;
+  try {
+    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000", { headers: { "x-goog-api-key": apiKey }, signal });
+    if (!res.ok) return [];
+    const body = (await res.json()) as { models?: { name?: string }[] };
+    const version = (id: string) => Number(/gemini-(\d+(?:\.\d+)?)/.exec(id)?.[1] ?? 0);
+    const ids = (body.models ?? [])
+      .map((m) => (m.name ?? "").replace(/^models\//, ""))
+      .filter((id) => /^gemini-.*tts/.test(id))
+      .sort((x, y) => version(y) - version(x) || Number(/lite/.test(x)) - Number(/lite/.test(y)) || Number(/preview/.test(x)) - Number(/preview/.test(y)));
+    ttsModelList = { at: Date.now(), ids };
+    return ids;
+  } catch {
+    return [];
+  }
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 async function geminiTts(cfg: TtsConfig, text: string, languageName: string, signal: AbortSignal): Promise<Synthesized> {
+  // A short style direction makes the voice warm and natural; the model reads
+  // only the text after the colon.
+  const prompt = `Say in ${languageName}, in a warm, calm, gentle and natural voice, at a relaxed pace, like a kind nurse explaining something to a patient: ${text}`;
+  let useVoice = true;
   const call = (model: string) =>
     fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: "POST",
       signal,
       headers: { "Content-Type": "application/json", "x-goog-api-key": cfg.apiKey },
       body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: `Read aloud in ${languageName}, in a calm, clear and warm voice: ${text}` }] }],
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: {
           responseModalities: ["AUDIO"],
-          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: cfg.voice } } },
+          ...(useVoice && cfg.voice ? { speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: cfg.voice } } } } : {}),
         },
       }),
     });
-  const models = [cfg.model!, ...GEMINI_TTS_MODELS.filter((m) => m !== cfg.model)];
-  let res = await call(models[0]);
-  for (let i = 1; i < models.length && res.status === 404; i++) {
-    res = await call(models[i]);
-    if (res.ok) cfg.model = workingGeminiModel = models[i]; // remember it for later requests
+
+  const queue = [cfg.model!, ...GEMINI_TTS_MODELS.filter((m) => m !== cfg.model)];
+  const tried = new Set<string>();
+  let res: Response | null = null;
+  let busy = false;
+  let discovered = false;
+  while (queue.length) {
+    const m = queue.shift()!;
+    if (tried.has(m)) continue;
+    tried.add(m);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      res = await call(m);
+      // An unknown voice name: use the model's default voice instead.
+      if (res.status === 400 && useVoice && /voice/i.test(await res.clone().text())) {
+        useVoice = false;
+        res = await call(m);
+      }
+      if (![429, 500, 502, 503, 504].includes(res.status) || attempt === 1) break;
+      await sleep(1200);
+    }
+    if (res!.ok) {
+      if (m !== cfg.model && !busy) workingGeminiModel = m;
+      break;
+    }
+    if (res!.status === 404) {
+      if (!discovered) {
+        discovered = true;
+        queue.push(...(await listGeminiTtsModels(cfg.apiKey, signal)).filter((x) => !tried.has(x)).slice(0, 3));
+      }
+      continue;
+    }
+    if ([429, 500, 502, 503, 504].includes(res!.status)) {
+      busy = true;
+      continue;
+    }
+    break;
   }
-  if (!res.ok) await failure(res, "Gemini");
-  const body = await res.json();
+  if (!res!.ok) {
+    if (busy) throw new AIError("provider_error", "The voice service is busy right now.", 503);
+    await failure(res!, "Gemini");
+  }
+  const body = await res!.json();
   const part = body?.candidates?.[0]?.content?.parts?.find((p: { inlineData?: unknown }) => p.inlineData);
   const data: string | undefined = part?.inlineData?.data;
   if (!data) throw new AIError("invalid_response", "Gemini returned no audio.");

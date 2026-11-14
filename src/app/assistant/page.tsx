@@ -71,7 +71,7 @@ export default function AssistantPage() {
     }
     setMessages((m) => [...m, reply]);
     setBusy(false);
-    if (autoSpeak) speech.speak({ id: `msg-${reply.id}`, label: tr("Assistant answer"), text: reply.text });
+    if (autoSpeak) speech.speak({ id: `msg-${reply.id}`, label: tr("Assistant answer"), lang: language, text: reply.text });
   };
 
   const showText = typing || !rec.supported;
@@ -135,7 +135,7 @@ export default function AssistantPage() {
                   <p className="whitespace-pre-wrap text-[17px] leading-relaxed">{m.text}</p>
                   {m.role === "assistant" && (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <SpeakButton req={{ id: `msg-${m.id}`, label: tr("Assistant answer"), text: m.text }} />
+                      <SpeakButton req={{ id: `msg-${m.id}`, label: tr("Assistant answer"), lang: language, text: m.text }} />
                       {m.urgent && (
                         <a href="tel:911" className="rounded-full bg-red-600 px-3 py-1.5 text-sm font-bold text-white">
                           {tr("Call 911")}
