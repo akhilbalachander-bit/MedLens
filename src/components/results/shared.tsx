@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
+
 import { useTr } from "@/lib/i18n";
 import Link from "next/link";
 import { ScanLine } from "lucide-react";
 import { useMedLens } from "@/lib/store";
 import { ScanFlow } from "../scan/ScanFlow";
-import { Card } from "../ui";
+import { Card, cx } from "../ui";
 
 /** Wraps translated content with the right lang/dir attributes (RTL for Arabic etc.). */
 export function Localized({ children, className, as: Tag = "div" }: { children: React.ReactNode; className?: string; as?: "div" | "span" | "p" }) {
@@ -45,4 +47,29 @@ export function joinSpeech(parts: (string | null | undefined | false)[]) {
     .filter((p): p is string => !!p && !!p.trim())
     .map((p) => (/[.!?。！？؟।:]$/.test(p.trim()) ? p.trim() : `${p.trim()}.`))
     .join(" ");
+}
+
+/**
+ * The document's exact original wording. In English it is shown as is; in any
+ * other language the page shows only the translation, with the original one
+ * tap away ("Show original") for checking with a pharmacist or doctor.
+ */
+export function OriginalText({ text, className }: { text: string | null | undefined; className?: string }) {
+  const { language } = useMedLens();
+  const tr = useTr();
+  const [open, setOpen] = useState(false);
+  if (!text) return null;
+  if (language.code === "en") return <span className={className}>{text}</span>;
+  return (
+    <span className="block">
+      <button type="button" onClick={() => setOpen((o) => !o)} className="text-xs font-medium text-brand-800 underline" aria-expanded={open}>
+        {tr(open ? "Hide original" : "Show original")}
+      </button>
+      {open && (
+        <span lang="en" dir="ltr" className={cx("mt-1 block rounded bg-slate-50 p-2 font-mono text-xs text-ink-soft", className)}>
+          {text}
+        </span>
+      )}
+    </span>
+  );
 }

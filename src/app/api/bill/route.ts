@@ -27,9 +27,8 @@ export async function POST(req: Request) {
     }
     if (cfg.provider === "mock") return Response.json(sampleBillResult("mock"));
 
-    const rawLang = String(form.get("language") ?? "English");
-    const languageName = /^[\p{L} ()-]{2,60}$/u.test(rawLang) ? rawLang : "English";
-    const raw = await generateJson(cfg, { system: BILL_SYSTEM, prompt: billPrompt(files.length, languageName), files, timeoutMs: 270_000 });
+    // Written in English; the browser translates it with the rest of the page.
+    const raw = await generateJson(cfg, { system: BILL_SYSTEM, prompt: billPrompt(files.length), files, timeoutMs: 270_000 });
     const parsed = BillAnalysisSchema.safeParse(raw);
     if (!parsed.success) throw new AIError("invalid_response", "The AI response did not match the expected bill format.");
     const result: BillAnalysisResult = {

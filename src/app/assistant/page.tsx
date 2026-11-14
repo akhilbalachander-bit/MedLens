@@ -86,7 +86,7 @@ export default function AssistantPage() {
           <p className="mt-1 text-ink-soft">
             {tr("Ask about your paperwork out loud or by typing.")}{" "}
             {analysis
-              ? tr("Answers use your document from {place}.", { place: analysis.facility_name ?? tr("your scan") })
+              ? tr("Answers use your document from {place}.", { place: analysis.facility_name ? t("facility", analysis.facility_name) : tr("your scan") })
               : tr("Scan a document first for answers about it.")}
           </p>
         </div>

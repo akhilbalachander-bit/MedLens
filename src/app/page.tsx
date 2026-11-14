@@ -8,7 +8,7 @@ import { Card } from "@/components/ui";
 import { useTr } from "@/lib/i18n";
 
 export default function HomePage() {
-  const { analysis, hydrated, provider } = useMedLens();
+  const { analysis, hydrated, provider, t } = useMedLens();
   const tr = useTr();
   return (
     <div className="space-y-8">
@@ -27,7 +27,7 @@ export default function HomePage() {
           <span>
             <span className="block text-sm font-medium text-brand-800">{tr("Continue where you left off")}</span>
             <span className="block font-semibold text-ink">
-              {analysis.facility_name ?? tr("Your scanned document")}
+              {analysis.facility_name ? t("facility", analysis.facility_name) : tr("Your scanned document")}
               {analysis.meta.source === "sample" && ` (${tr("sample")})`}
             </span>
           </span>

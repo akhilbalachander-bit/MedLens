@@ -6,7 +6,7 @@ import { BookOpen, ChevronDown, FileText, MessageSquareText, Pill, Sparkles, Ste
 import { useMedLens } from "@/lib/store";
 import { ListenBar, SpeakButton } from "../speech/ListenControls";
 import { Badge, Card, cx, Notice, SectionTitle } from "../ui";
-import { joinSpeech, Localized } from "./shared";
+import { joinSpeech, Localized, OriginalText } from "./shared";
 import { useTr } from "@/lib/i18n";
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -27,13 +27,13 @@ export function UnderstandTab() {
   const nonEn = language.code !== "en";
 
   const summaryText = joinSpeech([t("ui.whatHappened"), t("summary.simple", a.patient_summary.simple_english)]);
-  const diagnosesText = joinSpeech([t("ui.diagnoses"), ...a.diagnoses.map((d) => `${d.original_term}: ${t(`dx.${d.id}`, d.simple_explanation)}`)]);
+  const diagnosesText = joinSpeech([t("ui.diagnoses"), ...a.diagnoses.map((d) => `${t(`dx.${d.id}.term`, d.original_term)}: ${t(`dx.${d.id}`, d.simple_explanation)}`)]);
   const instructionsText = joinSpeech([t("ui.simpleWords"), ...a.instructions.map((i) => t(`ins.${i.id}.simple`, i.simple ?? i.original))]);
   const medsText = joinSpeech([
     t("ui.medications"),
-    ...a.medications.map((m) => joinSpeech([`${m.name} ${m.strength ?? ""}`, t(`med.${m.id}.simple`, m.instructions_simple ?? m.instructions_original)])),
+    ...a.medications.map((m) => joinSpeech([`${t(`med.${m.id}.name`, m.name)} ${m.strength ?? ""}`, t(`med.${m.id}.simple`, m.instructions_simple ?? m.instructions_original)])),
   ]);
-  const glossaryText = joinSpeech([t("ui.glossary"), ...a.glossary.map((g) => `${g.term}: ${t(`gl.${g.id}`, g.simple_definition)}`)]);
+  const glossaryText = joinSpeech([t("ui.glossary"), ...a.glossary.map((g) => `${t(`gl.${g.id}.term`, g.term)}: ${t(`gl.${g.id}`, g.simple_definition)}`)]);
   const fullText = joinSpeech([summaryText, diagnosesText, medsText, instructionsText, glossaryText, t("ui.notDiagnosis")]);
 
   return (
@@ -56,7 +56,7 @@ export function UnderstandTab() {
           <Notice tone="info">{tr("Your document does not include a visit summary, so MedLens did not write one. See the instructions below.")}</Notice>
         )}
         {a.patient_summary.original && (
-          <OriginalToggle label={t("ui.docSays")} text={a.patient_summary.original} />
+          <OriginalToggle label={t("ui.docSays")} text={t("summary.orig", a.patient_summary.original)} original={a.patient_summary.original} />
         )}
         {a.diagnoses.length > 0 && (
           <div className="mt-4 border-t border-slate-100 pt-4">
@@ -69,7 +69,7 @@ export function UnderstandTab() {
             <ul className="space-y-2">
               {a.diagnoses.map((d) => (
                 <li key={d.id} className="rounded-xl bg-slate-50 p-3">
-                  <p className="text-sm font-medium text-ink-soft">{d.original_term}</p>
+                  <Localized as="p" className="text-sm font-medium text-ink-soft">{t(`dx.${d.id}.term`, d.original_term)}</Localized>
                   {d.simple_explanation && <Localized as="p" className="mt-0.5 text-ink">{t(`dx.${d.id}`, d.simple_explanation)}</Localized>}
                 </li>
               ))}
@@ -92,7 +92,7 @@ export function UnderstandTab() {
               <li key={m.id} className="py-3 first:pt-0 last:pb-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-semibold text-ink">
-                    {m.name} {m.strength}
+                    {t(`med.${m.id}.name`, m.name)} {m.strength}
                   </span>
                   {m.status !== "unknown" && (
                     <Badge tone={m.status === "stop" ? "red" : m.status === "changed" ? "amber" : m.status === "new" ? "blue" : "slate"}>
@@ -143,11 +143,13 @@ export function UnderstandTab() {
                       <FileText className="h-3.5 w-3.5" /> <Localized as="span">{t("ui.docSays")}</Localized>
                     </p>
                     <Badge>{tr(CATEGORY_LABEL[ins.category])}</Badge>
-                    <p className="mt-1 font-mono text-sm text-ink-soft">{ins.original}</p>
-                    {nonEn && t(`ins.${ins.id}.orig`) !== ins.original && (
-                      <Localized as="p" className="mt-1 text-xs text-ink-muted">
-                        {t("ui.directTranslation")}: {t(`ins.${ins.id}.orig`)}
-                      </Localized>
+                    {nonEn ? (
+                      <>
+                        <Localized as="p" className="mt-1 text-sm text-ink-soft">{t(`ins.${ins.id}.orig`, ins.original)}</Localized>
+                        <OriginalText text={ins.original} />
+                      </>
+                    ) : (
+                      <p className="mt-1 font-mono text-sm text-ink-soft">{ins.original}</p>
                     )}
                   </div>
                   <div className="rounded-lg bg-brand-50/70 p-2.5">
@@ -179,14 +181,19 @@ export function UnderstandTab() {
   );
 }
 
-function OriginalToggle({ label, text }: { label: string; text: string }) {
+function OriginalToggle({ label, text, original }: { label: string; text: string; original: string }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="mt-3">
       <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-1 text-sm font-medium text-brand-800" aria-expanded={open}>
         <ChevronDown className={cx("h-4 w-4 transition", open && "rotate-180")} /> <Localized as="span">{label}</Localized>
       </button>
-      {open && <p className="mt-2 rounded-lg bg-slate-50 p-3 font-mono text-sm text-ink-soft">{text}</p>}
+      {open && (
+        <div className="mt-2 rounded-lg bg-slate-50 p-3 text-sm text-ink-soft">
+          <Localized as="p">{text}</Localized>
+          {text !== original && <OriginalText text={original} />}
+        </div>
+      )}
     </div>
   );
 }
@@ -234,17 +241,15 @@ function Glossary() {
                 onClick={() => setOpen((o) => ({ ...o, [g.id!]: !o[g.id!] }))}
                 aria-expanded={isOpen}
               >
-                <span className="font-semibold text-ink">{g.term}</span>
+                <Localized as="span" className="font-semibold text-ink">{t(`gl.${g.id}.term`, g.term)}</Localized>
                 <ChevronDown className={cx("h-4 w-4 shrink-0 text-ink-muted transition", isOpen && "rotate-180")} />
               </button>
               {isOpen && (
                 <div className="px-3 pb-3">
                   <Localized as="p" className="text-ink">{def}</Localized>
-                  {language.code !== "en" && def !== g.simple_definition && (
-                    <p className="mt-1 text-xs text-ink-muted">{tr("English")}: {g.simple_definition}</p>
-                  )}
+                  {language.code !== "en" && <OriginalText text={`${g.term}: ${g.simple_definition}`} />}
                   <div className="mt-2 flex items-center gap-2">
-                    <SpeakButton req={{ id: `gl-${g.id}`, label: g.term, text: `${g.term}. ${def}` }} />
+                    <SpeakButton req={{ id: `gl-${g.id}`, label: t(`gl.${g.id}.term`, g.term), text: `${t(`gl.${g.id}.term`, g.term)}. ${def}` }} />
                     {!g.appears_in_document && <Badge>{tr("Related term")}</Badge>}
                   </div>
                 </div>

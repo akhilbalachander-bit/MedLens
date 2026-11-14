@@ -12,7 +12,7 @@ import { Localized } from "./shared";
 import { useTr } from "@/lib/i18n";
 
 export function WalletTab() {
-  const { analysis } = useMedLens();
+  const { analysis, t } = useMedLens();
   const tr = useTr();
   const fin = analysis!.financial_information;
   return (
@@ -26,9 +26,9 @@ export function WalletTab() {
           <dl className="grid gap-2 sm:grid-cols-2">
             {fin.map((f) => (
               <div key={f.id} className="rounded-xl bg-slate-50 p-3">
-                <dt className="text-sm text-ink-muted">{f.label}</dt>
-                <dd className="font-semibold text-ink">{f.value ?? tr("Not listed")}</dd>
-                {f.note && <dd className="mt-1 text-sm text-ink-soft">{f.note}</dd>}
+                <dt className="text-sm text-ink-muted">{t(`fi.${f.id}.label`, f.label)}</dt>
+                <dd className="font-semibold text-ink">{f.value ? t(`fi.${f.id}.value`, f.value) : tr("Not listed")}</dd>
+                {f.note && <dd className="mt-1 text-sm text-ink-soft">{t(`fi.${f.id}.note`, f.note)}</dd>}
               </div>
             ))}
           </dl>
@@ -69,20 +69,22 @@ function SavingsRow({ m }: { m: Medication }) {
   const ref = lookupDrug(m.generic_name, m.name, m.brand_name);
   const searchName = (ref?.generic ?? m.generic_name ?? m.name).replace(/\b(odt|tab|tablet|cap|capsule)s?\b/gi, "").trim();
   const links = priceLinks(searchName);
-  const brands = ref?.brands.length ? ref.brands.join(", ") : (m.brand_name ?? null);
   const tr = useTr();
+  const { t } = useMedLens();
+  const brands = ref?.brands.length ? tr(ref.brands.join(", ")) : m.brand_name ? t(`med.${m.id}.brand`, m.brand_name) : null;
+  const generic = m.generic_name ? t(`med.${m.id}.generic`, m.generic_name) : ref?.generic ? tr(ref.generic) : null;
   return (
     <li className="rounded-xl border border-slate-200 p-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-lg font-semibold text-ink">
-          {m.name} {m.strength}
+          {t(`med.${m.id}.name`, m.name)} {m.strength}
         </span>
         {ref?.otc && <Badge tone="blue">{tr("Also sold over the counter")}</Badge>}
       </div>
       <dl className="mt-2 grid gap-x-4 gap-y-1 text-[15px] sm:grid-cols-2">
         <div>
           <dt className="inline text-ink-muted">{tr("Generic name:")} </dt>
-          <dd className="inline text-ink">{ref?.generic ?? m.generic_name ?? tr("Not available in our reference")}</dd>
+          <dd className="inline text-ink">{generic ?? tr("Not available in our reference")}</dd>
         </div>
         <div>
           <dt className="inline text-ink-muted">{tr("Brand name(s):")} </dt>
@@ -138,7 +140,7 @@ function ShoppableFollowUps() {
               return (
                 <li key={ts.id} className="rounded-xl border border-slate-200 p-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-ink">{ts.name}</span>
+                    <Localized as="span" className="font-semibold text-ink">{t(`ts.${ts.id}.name`, ts.name)}</Localized>
                     <Badge tone={ts.type === "lab" ? "blue" : "brand"}>{tr(ts.type === "lab" ? "Lab" : ts.type === "imaging" ? "Imaging" : "Test")}</Badge>
                   </div>
                   <Localized as="p" className="mt-1 text-ink">

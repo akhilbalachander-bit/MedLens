@@ -38,11 +38,12 @@ export function localAnswer(
 
   // Specific medication mentioned
   const meds = a.medications.filter((m) =>
-    [m.name, m.generic_name, m.brand_name].some((n) => n && text.includes(n.toLowerCase().split(" ")[0])),
+    [m.name, m.generic_name, m.brand_name, t(`med.${m.id}.name`, m.name)].some((n) => n && text.includes(n.toLowerCase().split(" ")[0])),
   );
   for (const m of meds) {
-    add(`${tr("Medication")}: ${m.name}`, [
-      `${m.name}${m.strength ? ` ${m.strength}` : ""}:`,
+    const name = t(`med.${m.id}.name`, m.name);
+    add(`${tr("Medication")}: ${name}`, [
+      `${name}${m.strength ? ` ${m.strength}` : ""}:`,
       t(`med.${m.id}.simple`, m.instructions_simple ?? m.instructions_original),
       ...m.warnings.map((w, i) => t(`med.${m.id}.warn.${i}`, w)),
       m.needs_verification ? t(`med.${m.id}.verify`, m.verification_reason) : null,
@@ -52,23 +53,26 @@ export function localAnswer(
   // Glossary term mentioned
   for (const g of a.glossary) {
     const term = g.term.toLowerCase().split(/[ (/]/)[0];
-    if (term.length > 2 && text.includes(term)) add(`${tr("Glossary")}: ${g.term}`, [`${g.term}: ${t(`gl.${g.id}`, g.simple_definition)}`], false);
+    const local = t(`gl.${g.id}.term`, g.term);
+    const localWord = local.toLowerCase().split(/[ (/]/)[0];
+    if ((term.length > 2 && text.includes(term)) || (localWord.length > 2 && text.includes(localWord)))
+      add(`${tr("Glossary")}: ${local}`, [`${local}: ${t(`gl.${g.id}`, g.simple_definition)}`], false);
   }
 
   if (!meds.length && has(/medic|medicine|pill|tablet|dose|take|drug|prescri/))
     add(
       "Medications",
-      a.medications.map((m) => `${m.name}${m.strength ? ` ${m.strength}` : ""}: ${t(`med.${m.id}.simple`, m.instructions_simple ?? m.instructions_original)}`),
+      a.medications.map((m) => `${t(`med.${m.id}.name`, m.name)}${m.strength ? ` ${m.strength}` : ""}: ${t(`med.${m.id}.simple`, m.instructions_simple ?? m.instructions_original)}`),
     );
   if (has(/follow|appointment|doctor|clinic|phone|call|schedule|see /))
     add(
       "Follow-up",
       a.follow_up.map((f) =>
-        [f.provider_name, f.clinic_name, f.phone, f.timeframe && t(`fu.${f.id}.timeframe`, f.timeframe), f.reason && t(`fu.${f.id}.reason`, f.reason)].filter(Boolean).join(", "),
+        [f.provider_name && t(`fu.${f.id}.provider`, f.provider_name), f.clinic_name && t(`fu.${f.id}.clinic`, f.clinic_name), f.phone, f.timeframe && t(`fu.${f.id}.timeframe`, f.timeframe), f.reason && t(`fu.${f.id}.reason`, f.reason)].filter(Boolean).join(", "),
       ),
     );
   if (has(/test|lab|blood|x-?ray|mri|scan|imaging|ct\b/))
-    add("Ordered tests", a.ordered_tests.map((ts) => `${ts.name}: ${t(`ts.${ts.id}.explain`, ts.simple_explanation)} ${ts.timing ? t(`ts.${ts.id}.timing`, ts.timing) : ""}`));
+    add("Ordered tests", a.ordered_tests.map((ts) => `${t(`ts.${ts.id}.name`, ts.name)}: ${t(`ts.${ts.id}.explain`, ts.simple_explanation)} ${ts.timing ? t(`ts.${ts.id}.timing`, ts.timing) : ""}`));
   const byCat = (cats: string[]) => a.instructions.filter((i) => cats.includes(i.category)).map((i) => t(`ins.${i.id}.simple`, i.simple ?? i.original));
   if (has(/eat|food|diet|drink|fluid|water/)) add("Food & drink", byCat(["diet"]));
   if (has(/activit|exercise|drive|driving|work|walk|sport|lift/)) add("Activity", byCat(["activity"]));
