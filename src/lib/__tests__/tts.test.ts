@@ -63,7 +63,7 @@ describe("synthesize", () => {
     expect(out.audio.toString()).toBe("mp3data");
   });
 
-  it("Gemini: wraps returned PCM as WAV and names the language", async () => {
+  it("Gemini: wraps returned PCM as WAV and speaks exactly the given text", async () => {
     process.env.GEMINI_API_KEY = "g";
     let prompt = "";
     vi.stubGlobal(
@@ -76,8 +76,7 @@ describe("synthesize", () => {
       }),
     );
     const out = await synthesize(getTtsConfig()!, "Hallo unique-2", "de-DE", "German");
-    expect(prompt).toContain("German");
-    expect(prompt).toContain("Hallo unique-2");
+    expect(prompt).toBe("Hallo unique-2");
     expect(out.mimeType).toBe("audio/wav");
     expect(out.audio.length).toBe(54);
   });
@@ -132,13 +131,14 @@ describe("Gemini voice resilience", () => {
     return calls;
   }
 
-  it("uses a warm voice and a natural speaking style by default", async () => {
+  it("uses a warm voice and sends only the words to speak (no English direction that could be read aloud)", async () => {
     process.env.GEMINI_API_KEY = "g";
     let body: Record<string, any> = {};
     fake((_m, b) => ((body = b), audio()));
-    await synthesize(getTtsConfig()!, "Xin chào", "vi-VN", "Vietnamese");
+    await synthesize(getTtsConfig()!, "Xin chào, đây là hướng dẫn của bạn.", "vi-VN", "Vietnamese");
     expect(body.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName).toBe("Sulafat");
-    expect(body.contents[0].parts[0].text).toMatch(/Vietnamese.*warm.*natural.*: Xin chào$/);
+    expect(body.contents[0].parts).toEqual([{ text: "Xin chào, đây là hướng dẫn của bạn." }]);
+    expect(JSON.stringify(body)).not.toMatch(/Say in|nurse|warm/);
   });
 
   it("finds the voice model this key has when the built-in names are not found", async () => {

@@ -141,10 +141,12 @@ export async function listGeminiTtsModels(apiKey: string, signal?: AbortSignal):
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function geminiTts(cfg: TtsConfig, text: string, languageName: string, signal: AbortSignal): Promise<Synthesized> {
-  // A short style direction makes the voice warm and natural; the model reads
-  // only the text after the colon.
-  const prompt = `Say in ${languageName}, in a warm, calm, gentle and natural voice, at a relaxed pace, like a kind nurse explaining something to a patient: ${text}`;
+async function geminiTts(cfg: TtsConfig, text: string, _languageName: string, signal: AbortSignal): Promise<Synthesized> {
+  // Send ONLY the words to be spoken. A style direction in front of the text
+  // ("Say in Vietnamese, warmly: …") is sometimes read aloud in English, so
+  // there is none: the model detects the language from the text itself, and
+  // the warm, calm sound comes from the chosen voice (default "Sulafat").
+  const prompt = text;
   let useVoice = true;
   const call = (model: string) =>
     fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
