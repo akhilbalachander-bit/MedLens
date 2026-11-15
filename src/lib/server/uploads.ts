@@ -35,7 +35,8 @@ export async function readUploads(form: FormData, provider: ProviderName | null)
         415,
       );
     }
-    out.push({ name: f.name || "page", mimeType: mime, base64: Buffer.from(buf).toString("base64") });
+    // A neutral name: file names often contain the patient's name.
+    out.push({ name: `page-${out.length + 1}`, mimeType: mime, base64: Buffer.from(buf).toString("base64") });
   }
   return out;
 }

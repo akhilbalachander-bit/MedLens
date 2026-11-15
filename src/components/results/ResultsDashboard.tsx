@@ -116,7 +116,7 @@ export function ResultsDashboard() {
         )}
       </header>
 
-      <div role="tablist" aria-label={tr("Results")} className="sticky top-14 z-10 -mx-4 grid grid-cols-3 gap-1 border-b border-slate-200 bg-slate-50/95 px-4 pt-1 backdrop-blur">
+      <div role="tablist" aria-label={tr("Results")} className="sticky top-[76px] z-20 grid grid-cols-3 gap-1 rounded-full border border-white/10 bg-navy-900/80 p-1 shadow-[0_18px_40px_-20px_rgba(0,0,0,0.9)] backdrop-blur-xl">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -126,8 +126,8 @@ export function ResultsDashboard() {
             aria-controls={`panel-${t.id}`}
             onClick={() => select(t.id)}
             className={cx(
-              "flex flex-col items-center gap-1 rounded-t-xl border-b-[3px] px-2 py-2.5 text-sm font-semibold sm:flex-row sm:justify-center sm:text-base",
-              tab === t.id ? "border-brand-700 bg-white text-brand-800" : "border-transparent text-ink-muted hover:text-ink",
+              "flex flex-col items-center justify-center gap-1 rounded-full px-2 py-2 text-xs font-semibold transition sm:flex-row sm:gap-2 sm:text-sm",
+              tab === t.id ? "bg-[#12b3bf] text-[#021015] shadow-[0_8px_24px_-10px_rgba(18,179,191,0.9)]" : "text-ink-soft hover:bg-white/[0.06] hover:text-white",
             )}
           >
             <t.icon className="h-5 w-5" aria-hidden />

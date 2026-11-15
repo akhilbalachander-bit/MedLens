@@ -57,7 +57,7 @@ src/lib/server/rate-limit.ts Per-visitor limits for the public site
   - Emergency keywords always add 911 guidance.
   - An urgent question never gets an "expected symptoms" answer.
   - Bill duplicates are labelled "for review".
-- **Privacy:** no login. Uploads are processed in memory and never written to disk. Results live in `sessionStorage`; only preferences go to `localStorage`.
+- **Privacy:** personal details (names, birth dates → age ranges, addresses, phones, emails, ID numbers) are found and covered **on the device** before upload, and the patient reviews every page first; the AI only receives covered pages. A second scrub runs on the server. No login, no database: uploads are processed in memory, results live in `sessionStorage`. See [PRIVACY.md](PRIVACY.md) and the in-app Privacy Policy (`/privacy`) and Terms (`/terms`).
 
 ## Configuration
 

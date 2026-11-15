@@ -48,7 +48,7 @@ export function ListenBar({ full, className, sticky = true }: { full: SpeakReque
   return (
     <div
       className={cx(
-        "no-print z-10 rounded-2xl border border-brand-200 bg-white/95 p-3 shadow-card backdrop-blur",
+        "no-print ml-panel z-10 p-3",
         sticky && "sticky bottom-20 lg:bottom-4",
         className,
       )}
@@ -66,7 +66,7 @@ export function ListenBar({ full, className, sticky = true }: { full: SpeakReque
             onClick={() =>
               s.status === "loading" ? s.stop() : active ? (s.status === "speaking" ? s.pause() : s.resume()) : s.speak(full)
             }
-            className="inline-flex min-h-[56px] items-center justify-center gap-3 rounded-2xl bg-brand-700 px-5 text-lg font-bold text-white shadow hover:bg-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
+            className="inline-flex min-h-[56px] items-center justify-center gap-3 rounded-full bg-[#12b3bf] px-6 text-lg font-bold text-[#021015] shadow-[0_10px_30px_-12px_rgba(18,179,191,0.9)] transition hover:bg-[#2fd0da] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
             aria-label={
               s.status === "loading"
                 ? tr("Cancel")

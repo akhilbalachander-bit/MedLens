@@ -1,5 +1,4 @@
 import "server-only";
-import { createHash } from "node:crypto";
 import { AIError } from "@/lib/ai/provider";
 
 /**
@@ -48,26 +47,14 @@ let workingGeminiModel: string | null = null;
 export function resetTtsState() {
   workingGeminiModel = null;
   ttsModelList = null;
-  cache.clear();
-  cacheBytes = 0;
 }
 export const GEMINI_TTS_MODELS = ["gemini-3.8-flash-tts", "gemini-3.8-flash-lite-tts"];
 
 export type Synthesized = { audio: Buffer; mimeType: string };
 
-// Small in-memory cache: the same instructions are often replayed.
-const cache = new Map<string, Synthesized>();
-let cacheBytes = 0;
-const CACHE_LIMIT = 40 * 1024 * 1024;
-
+// No server-side audio cache: spoken text comes from a patient's document, so
+// MedLens keeps none of it in server memory. (The browser caches its own copy.)
 export async function synthesize(cfg: TtsConfig, text: string, locale: string, languageName: string): Promise<Synthesized> {
-  const key = createHash("sha256").update([cfg.provider, cfg.model, cfg.voice, locale, text].join("\u0000")).digest("hex");
-  const hit = cache.get(key);
-  if (hit) {
-    cache.delete(key);
-    cache.set(key, hit);
-    return hit;
-  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 55_000);
   let out: Synthesized;
@@ -84,13 +71,6 @@ export async function synthesize(cfg: TtsConfig, text: string, locale: string, l
     throw new AIError("provider_error", `Could not reach the voice service: ${(e as Error).message}`);
   } finally {
     clearTimeout(timer);
-  }
-  cache.set(key, out);
-  cacheBytes += out.audio.length;
-  for (const [k, v] of cache) {
-    if (cacheBytes <= CACHE_LIMIT) break;
-    cache.delete(k);
-    cacheBytes -= v.audio.length;
   }
   return out;
 }

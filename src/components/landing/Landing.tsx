@@ -330,7 +330,16 @@ export function Landing() {
         </section>
 
         </main>
-        <p className="ml-footnote">{tr("MedLens explains paperwork. It is not medical advice. In an emergency, call 911.")}</p>
+        <p className="ml-footnote">
+          {tr("MedLens explains paperwork. It is not medical advice. In an emergency, call 911.")}{" "}
+          <Link href="/privacy" className="ml-foot-link">
+            {tr("Privacy")}
+          </Link>{" "}
+          ·{" "}
+          <Link href="/terms" className="ml-foot-link">
+            {tr("Terms")}
+          </Link>
+        </p>
       </div>
     </div>
   );
