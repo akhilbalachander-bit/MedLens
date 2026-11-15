@@ -26,7 +26,8 @@ export class AIError extends Error {
       | "provider_error"
       | "invalid_response"
       | "unsupported_file"
-      | "timeout",
+      | "timeout"
+      | "quota",
     message: string,
     public status = 502,
   ) {

@@ -1,5 +1,5 @@
 import { generateJson, getProviderConfig, listGeminiModels } from "@/lib/ai/provider";
-import { getTtsConfig, listGeminiTtsModels, synthesize } from "@/lib/tts/server";
+import { getTtsConfig, listGeminiTtsModels, synthesize, voiceDiagnostics } from "@/lib/tts/server";
 import { maxFileBytes, maxFiles } from "@/lib/files";
 import { checkRateLimit } from "@/lib/server/rate-limit";
 
@@ -53,5 +53,5 @@ export async function GET(req: Request) {
     })(),
   ]);
   const voiceModels = tts?.provider === "gemini" ? (await listGeminiTtsModels(tts.apiKey)).slice(0, 8) : undefined;
-  return Response.json({ ...base, check, voiceCheck, availableModels, voiceModels });
+  return Response.json({ ...base, check, voiceCheck, voiceDiagnostics: voiceDiagnostics(), availableModels, voiceModels });
 }

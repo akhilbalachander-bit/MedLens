@@ -47,6 +47,10 @@ let workingGeminiModel: string | null = null;
 export function resetTtsState() {
   workingGeminiModel = null;
   ttsModelList = null;
+  geminiQuotaUntil = 0;
+  cloudBlockedUntil = 0;
+  lastVoiceProblem = "";
+  cloudProblem = "";
 }
 export const GEMINI_TTS_MODELS = ["gemini-3.8-flash-tts", "gemini-3.8-flash-lite-tts"];
 
@@ -54,17 +58,58 @@ export type Synthesized = { audio: Buffer; mimeType: string };
 
 // No server-side audio cache: spoken text comes from a patient's document, so
 // MedLens keeps none of it in server memory. (The browser caches its own copy.)
+// ---------- voice health (per server instance, in memory, no patient data) ----------
+// After Google says the free voice allowance is used up, stop asking for a few
+// minutes: every extra request would fail too and only delays the fallback.
+let geminiQuotaUntil = 0;
+let cloudBlockedUntil = 0;
+let lastVoiceProblem = "";
+let cloudProblem = "";
+
+export function voiceDiagnostics() {
+  const now = Date.now();
+  return {
+    lastGeminiVoiceProblem: lastVoiceProblem || null,
+    geminiVoicePausedSeconds: Math.max(0, Math.round((geminiQuotaUntil - now) / 1000)),
+    cloudTtsFallback: cloudProblem || (cloudBlockedUntil > now ? "paused" : "available or untested"),
+  };
+}
+
+const quotaError = () =>
+  new AIError("quota", "Natural voices have reached their free limit for now. Using this device's voice instead.", 429);
+
 export async function synthesize(cfg: TtsConfig, text: string, locale: string, languageName: string): Promise<Synthesized> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 55_000);
-  let out: Synthesized;
   try {
-    out =
-      cfg.provider === "google"
+    try {
+      return cfg.provider === "google"
         ? await googleTts(cfg, text, locale, controller.signal)
         : cfg.provider === "gemini"
-          ? await geminiTts(cfg, text, languageName, controller.signal)
+          ? await geminiTts(cfg, text, controller.signal)
           : await openaiTts(cfg, text, languageName, controller.signal);
+    } catch (e) {
+      // Gemini voices out of allowance or overloaded: try Google Cloud
+      // Text-to-Speech with the same key (works when that API is enabled on the
+      // key's Google Cloud project; it has a large free monthly allowance).
+      const geminiDown = cfg.provider === "gemini" && e instanceof AIError && (e.status === 429 || e.status === 503);
+      if (geminiDown && Date.now() >= cloudBlockedUntil) {
+        try {
+          const out = await googleTts(
+            { ...cfg, provider: "google", model: null, voice: process.env.GOOGLE_TTS_VOICE?.trim() ?? "Chirp3-HD-Kore" },
+            text,
+            locale,
+            controller.signal,
+          );
+          cloudProblem = "";
+          return out;
+        } catch (ce) {
+          cloudBlockedUntil = Date.now() + 60 * 60_000;
+          cloudProblem = (ce as Error).message;
+        }
+      }
+      throw e;
+    }
   } catch (e) {
     if (e instanceof AIError) throw e;
     if ((e as Error)?.name === "AbortError") throw new AIError("timeout", "The voice service took too long to respond.", 504);
@@ -72,7 +117,6 @@ export async function synthesize(cfg: TtsConfig, text: string, locale: string, l
   } finally {
     clearTimeout(timer);
   }
-  return out;
 }
 
 async function failure(res: Response, who: string): Promise<never> {
@@ -121,12 +165,11 @@ export async function listGeminiTtsModels(apiKey: string, signal?: AbortSignal):
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function geminiTts(cfg: TtsConfig, text: string, _languageName: string, signal: AbortSignal): Promise<Synthesized> {
+async function geminiTts(cfg: TtsConfig, text: string, signal: AbortSignal): Promise<Synthesized> {
+  if (Date.now() < geminiQuotaUntil) throw quotaError();
   // Send ONLY the words to be spoken. A style direction in front of the text
-  // ("Say in Vietnamese, warmly: …") is sometimes read aloud in English, so
-  // there is none: the model detects the language from the text itself, and
-  // the warm, calm sound comes from the chosen voice (default "Sulafat").
-  const prompt = text;
+  // is sometimes read aloud, so there is none: the model detects the language
+  // from the text, and the warm sound comes from the chosen voice.
   let useVoice = true;
   const call = (model: string) =>
     fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
@@ -134,59 +177,61 @@ async function geminiTts(cfg: TtsConfig, text: string, _languageName: string, si
       signal,
       headers: { "Content-Type": "application/json", "x-goog-api-key": cfg.apiKey },
       body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        contents: [{ role: "user", parts: [{ text }] }],
         generationConfig: {
           responseModalities: ["AUDIO"],
           ...(useVoice && cfg.voice ? { speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: cfg.voice } } } } : {}),
         },
       }),
     });
+  const errorText = async (res: Response) => {
+    const body = await res.clone().json().catch(() => null);
+    return String(body?.error?.message ?? res.statusText).slice(0, 300);
+  };
 
-  const queue = [cfg.model!, ...GEMINI_TTS_MODELS.filter((m) => m !== cfg.model)];
-  const tried = new Set<string>();
-  let res: Response | null = null;
-  let busy = false;
-  let discovered = false;
-  while (queue.length) {
-    const m = queue.shift()!;
-    if (tried.has(m)) continue;
-    tried.add(m);
-    for (let attempt = 0; attempt < 2; attempt++) {
+  // Free allowances are per model, so every voice model this key has is tried
+  // in turn: overloaded (5xx) gets one quick retry, used up (429) moves on at once.
+  const listed = await listGeminiTtsModels(cfg.apiKey, signal);
+  const queue = [...new Set([cfg.model!, ...GEMINI_TTS_MODELS, ...listed])].slice(0, 6);
+  let quota = 0;
+  let busy = 0;
+  let last = "";
+  for (const m of queue) {
+    let res = await call(m);
+    if (res.status === 400 && useVoice && /voice/i.test(await res.clone().text())) {
+      useVoice = false; // unknown voice name: use the model's default voice
       res = await call(m);
-      // An unknown voice name: use the model's default voice instead.
-      if (res.status === 400 && useVoice && /voice/i.test(await res.clone().text())) {
-        useVoice = false;
-        res = await call(m);
-      }
-      if (![429, 500, 502, 503, 504].includes(res.status) || attempt === 1) break;
+    }
+    if (res.status >= 500 && res.status <= 504) {
       await sleep(1200);
+      res = await call(m);
     }
-    if (res!.ok) {
-      if (m !== cfg.model && !busy) workingGeminiModel = m;
-      break;
+    if (res.ok) {
+      if (m !== cfg.model) workingGeminiModel = m;
+      lastVoiceProblem = "";
+      return audioFrom(await res.json());
     }
-    if (res!.status === 404) {
-      if (!discovered) {
-        discovered = true;
-        queue.push(...(await listGeminiTtsModels(cfg.apiKey, signal)).filter((x) => !tried.has(x)).slice(0, 3));
-      }
-      continue;
+    last = `${m}: ${res.status} ${await errorText(res)}`;
+    if (res.status === 429) quota++;
+    else if (res.status >= 500) busy++;
+    else if (res.status !== 404) {
+      lastVoiceProblem = last;
+      throw new AIError("provider_error", `Gemini voice error (${res.status}): ${await errorText(res)}`, 502);
     }
-    if ([429, 500, 502, 503, 504].includes(res!.status)) {
-      busy = true;
-      continue;
-    }
-    break;
   }
-  if (!res!.ok) {
-    if (busy) throw new AIError("provider_error", "The voice service is busy right now.", 503);
-    await failure(res!, "Gemini");
+  lastVoiceProblem = last;
+  if (quota && !busy) {
+    geminiQuotaUntil = Date.now() + 5 * 60_000;
+    throw quotaError();
   }
-  const body = await res!.json();
-  const part = body?.candidates?.[0]?.content?.parts?.find((p: { inlineData?: unknown }) => p.inlineData);
-  const data: string | undefined = part?.inlineData?.data;
+  throw new AIError("provider_error", "The voice service is busy right now.", 503);
+}
+
+function audioFrom(body: { candidates?: { content?: { parts?: { inlineData?: { data?: string; mimeType?: string } }[] } }[] }): Synthesized {
+  const part = body?.candidates?.[0]?.content?.parts?.find((p) => p.inlineData);
+  const data = part?.inlineData?.data;
   if (!data) throw new AIError("invalid_response", "Gemini returned no audio.");
-  const mime: string = part.inlineData.mimeType ?? "audio/L16;rate=24000";
+  const mime = part!.inlineData!.mimeType ?? "audio/L16;rate=24000";
   if (/wav|mpeg|mp3|ogg/.test(mime)) return { audio: Buffer.from(data, "base64"), mimeType: mime };
   const rate = Number(/rate=(\d+)/.exec(mime)?.[1] ?? 24000);
   return { audio: pcmToWav(Buffer.from(data, "base64"), rate), mimeType: "audio/wav" };
