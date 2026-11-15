@@ -18,7 +18,8 @@ With **no API key**, everything still works using built-in fictional data. That 
 
 | Area | What it does |
 | --- | --- |
-| **Home / Scan** | Scan with Camera (rear camera, flashlight, continuous autofocus, full-resolution stills, live hints for dark / blurry / glare, a quality check before you use each photo, retake, multi-page), Upload Document (JPG/PNG/WEBP/HEIC/PDF), Try Sample Document. A native-capture/upload fallback is shown when the camera is unavailable. |
+| **Home** | Cinematic landing: a glossy 3D heart (WebGL, Three.js) the camera orbits as you scroll, rising sparks and a teal-to-sapphire liquid background; four scroll slides (Scan, Understand, Listen, Act) with letter-by-letter reveals; Scan / Upload / Try Sample buttons. Falls back to a still background without WebGL; heavy motion and the custom cursor are off with reduced motion or touch. |
+| **Scan** | Scan with Camera (rear camera, flashlight, continuous autofocus, full-resolution stills, live hints for dark / blurry / glare, a quality check before you use each photo, retake, multi-page), Upload Document (JPG/PNG/WEBP/HEIC/PDF), Try Sample Document. A native-capture/upload fallback is shown when the camera is unavailable. |
 | **One analysis call** | `POST /api/analyze` validates the files (type, size, count, magic bytes), sends all pages to the vision model in **one** request, validates the JSON with Zod and returns a single object that powers every tab. |
 | **Tab 1: Understand Your Health** | "What happened?" summary at roughly a 5th-grade reading level, diagnoses, medications, original vs. simplified instructions, tappable glossary cards, a language selector and the Listen Aloud player. |
 | **Tab 2: Recovery & Safety** | Always-visible 911 banner; red / yellow / green symptom sections with source badges ("From your document" vs. "General safety guidance") and the exact quotes; an explicit message when the document lacks guidance; checklist with timelines taken only from the paperwork, in-app reminders and `.ics` calendar export; follow-up details, with missing fields shown as *Not listed*. |
@@ -31,6 +32,7 @@ With **no API key**, everything still works using built-in fictional data. That 
 ## Architecture
 
 ```
+src/components/landing/     Home page: heartScene.ts (3D stage) + Landing.tsx (overlay)
 src/lib/schema.ts           Analysis schema (lenient Zod) + normalisation & safety flags
 src/lib/ai/provider.ts      Provider layer: Gemini / OpenAI(-compatible) / mock via env vars
 src/lib/ai/prompts.ts       Safety-focused system prompts

@@ -30,16 +30,11 @@ const NAV = [
   { href: "/settings", label: "Settings", short: "Settings", icon: Settings },
 ];
 
-function Logo() {
+export function Logo({ className = "h-9" }: { className?: string }) {
   return (
-    <Link href="/" className="flex items-center gap-2 font-bold text-ink" aria-label="MedLens home">
-      <span className="grid h-9 w-9 place-items-center rounded-xl bg-brand-700 text-white">
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
-          <circle cx="10.5" cy="10.5" r="6.5" />
-          <path d="M10.5 7.5v6M7.5 10.5h6M15.5 15.5 20 20" strokeLinecap="round" />
-        </svg>
-      </span>
-      <span className="text-lg tracking-tight">MedLens</span>
+    <Link href="/" className="inline-flex shrink-0 items-center" aria-label="MedLens home">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/brand/medlens-logo-dark.png" alt="MedLens — AI Prescription & Discharge Translator" className={cx("w-auto", className)} />
     </Link>
   );
 }
@@ -50,6 +45,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const tr = useTr();
   const active = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
 
+  // The home page is a full-screen cinematic landing with its own header.
+  if (pathname === "/") {
+    return (
+      <>
+        {children}
+        <Toasts />
+        <ReminderWatcher />
+      </>
+    );
+  }
+
   return (
     <div className="min-h-screen">
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:p-2">
@@ -57,8 +63,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </a>
 
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-slate-200 bg-white px-4 py-5 lg:flex">
-        <Logo />
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-slate-200 bg-navy-900/95 px-4 py-5 backdrop-blur lg:flex">
+        <Logo className="h-12" />
         <nav className="mt-8 flex flex-col gap-1" aria-label="Main">
           {NAV.map((n) => (
             <Link
@@ -94,10 +100,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Top bar */}
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur lg:pl-64">
+      <header className="sticky top-0 z-20 border-b border-slate-200 bg-navy-900/85 backdrop-blur lg:pl-64">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-3 px-4">
           <div className="lg:hidden">
-            <Logo />
+            <Logo className="h-8" />
           </div>
           <div className="hidden text-sm text-ink-muted lg:block">{tr("Scan → Understand → Listen → Act")}</div>
           <div className="flex items-center gap-2">
@@ -116,7 +122,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* Mobile bottom navigation */}
-      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden">
+      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-navy-900/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
         <ul className="grid grid-cols-6">
           {NAV.map((n) => (
             <li key={n.href}>
@@ -152,7 +158,7 @@ function Toasts() {
           key={t.id}
           className={cx(
             "pointer-events-auto flex max-w-md items-start gap-2 rounded-xl px-4 py-3 text-sm text-white shadow-lg",
-            t.tone === "success" ? "bg-emerald-700" : t.tone === "warning" ? "bg-amber-700" : "bg-slate-800",
+            t.tone === "success" ? "bg-[#0b6b4f]" : t.tone === "warning" ? "bg-[#8a5a00]" : "bg-[#1d2c44]",
           )}
         >
           {t.tone === "success" ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : t.tone === "warning" ? <AlertTriangle className="h-4 w-4 shrink-0" /> : <Info className="h-4 w-4 shrink-0" />}

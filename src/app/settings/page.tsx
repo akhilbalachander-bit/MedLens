@@ -55,7 +55,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-5">
-      <h1 className="flex items-center gap-2 text-2xl font-bold text-ink">
+      <h1 className="flex items-center gap-2 font-display text-4xl font-normal tracking-wide text-ink sm:text-5xl">
         <Settings className="h-7 w-7 text-brand-700" /> {tr("Settings")}
       </h1>
 
