@@ -5,6 +5,7 @@ import { AlertOctagon, Keyboard, Mic, MicOff, Send, Volume2, VolumeX, Bot } from
 import { useMedLens } from "@/lib/store";
 import { useSpeechRecognition } from "@/lib/speech/recognition";
 import { localAnswer } from "@/lib/local-assistant";
+import { scrubText } from "@/lib/privacy/redact";
 import { detectEmergency, EMERGENCY_MESSAGE } from "@/lib/emergency";
 import { useSpeech } from "@/components/speech/SpeechContext";
 import { SpeakButton } from "@/components/speech/ListenControls";
@@ -54,10 +55,11 @@ export default function AssistantPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          question: q,
+          // Personal details the patient typed are removed before sending.
+          question: scrubText(q),
           language: { code: language.code, name: language.name },
           context: analysis ? { ...analysis, meta: undefined } : null,
-          history: messages.slice(-6).map((m) => ({ role: m.role, text: m.text.slice(0, 1500) })),
+          history: messages.slice(-6).map((m) => ({ role: m.role, text: scrubText(m.text.slice(0, 1500)) })),
         }),
       });
       const body = await res.json();

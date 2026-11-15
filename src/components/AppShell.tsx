@@ -23,10 +23,10 @@ import { cx } from "./ui";
 
 const NAV = [
   { href: "/", label: "Home", short: "Home", icon: Home },
-  { href: "/scan", label: "Scan Documents", short: "Scan", icon: ScanLine },
-  { href: "/medications", label: "My Medications", short: "Meds", icon: Pill },
-  { href: "/instructions", label: "Health Instructions", short: "Care", icon: ClipboardList },
-  { href: "/assistant", label: "Voice Assistant", short: "Ask", icon: Mic },
+  { href: "/scan", label: "Scan", short: "Scan", icon: ScanLine },
+  { href: "/medications", label: "Medications", short: "Meds", icon: Pill },
+  { href: "/instructions", label: "Instructions", short: "Care", icon: ClipboardList },
+  { href: "/assistant", label: "Assistant", short: "Ask", icon: Mic },
   { href: "/settings", label: "Settings", short: "Settings", icon: Settings },
 ];
 
@@ -57,72 +57,72 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen">
-      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:p-2">
+    <div className="app-shell min-h-screen">
+      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:p-2 focus:text-black">
         {tr("Skip to content")}
       </a>
 
-      {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-slate-200 bg-navy-900/95 px-4 py-5 backdrop-blur lg:flex">
-        <Logo className="h-12" />
-        <nav className="mt-8 flex flex-col gap-1" aria-label="Main">
-          {NAV.map((n) => (
-            <Link
-              key={n.href}
-              href={n.href}
-              aria-current={active(n.href) ? "page" : undefined}
-              className={cx(
-                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium",
-                active(n.href) ? "bg-brand-50 text-brand-800" : "text-ink-soft hover:bg-slate-50",
-              )}
-            >
-              <n.icon className="h-5 w-5" aria-hidden />
-              {tr(n.label)}
-            </Link>
-          ))}
-          {hydrated && analysis && (
-            <Link
-              href="/results"
-              aria-current={active("/results") ? "page" : undefined}
-              className={cx(
-                "mt-3 flex items-center gap-3 rounded-xl border px-3 py-2.5 text-[15px] font-semibold",
-                active("/results") ? "border-brand-300 bg-brand-50 text-brand-800" : "border-brand-200 text-brand-800 hover:bg-brand-50",
-              )}
-            >
-              <LayoutDashboard className="h-5 w-5" aria-hidden />
-              {tr("My results")}
-            </Link>
-          )}
-        </nav>
-        <p className="mt-auto text-xs leading-relaxed text-ink-muted">
-          {tr("MedLens explains your paperwork in plain language. It is not a doctor and does not give medical advice. In an emergency call 911.")}
-        </p>
-      </aside>
-
-      {/* Top bar */}
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-navy-900/85 backdrop-blur lg:pl-64">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-3 px-4">
-          <div className="lg:hidden">
-            <Logo className="h-8" />
-          </div>
-          <div className="hidden text-sm text-ink-muted lg:block">{tr("Scan → Understand → Listen → Act")}</div>
+      {/* Editorial top bar, like the home page */}
+      <header className="sticky top-0 z-30 border-b border-white/[0.08] bg-navy-950/70 backdrop-blur-xl">
+        <div className="mx-auto flex h-[68px] max-w-6xl items-center justify-between gap-4 px-5">
+          <Logo className="h-9 sm:h-10" />
+          <nav className="hidden items-center gap-5 lg:flex" aria-label="Main">
+            {NAV.map((n, i) => (
+              <span key={n.href} className="flex items-center gap-5">
+                {i > 0 && <span className="h-[3px] w-[3px] rounded-full bg-white/25" aria-hidden />}
+                <Link
+                  href={n.href}
+                  aria-current={active(n.href) ? "page" : undefined}
+                  className={cx(
+                    "relative py-1 text-[11px] font-semibold uppercase tracking-[0.2em] transition-colors",
+                    active(n.href)
+                      ? "text-white after:absolute after:-bottom-1 after:left-1/2 after:h-1 after:w-1 after:-translate-x-1/2 after:rounded-full after:bg-brand-500"
+                      : "text-ink-soft hover:text-white",
+                  )}
+                >
+                  {tr(n.label)}
+                </Link>
+              </span>
+            ))}
+          </nav>
           <div className="flex items-center gap-2">
+            <LanguageSelector compact />
             {hydrated && analysis && (
-              <Link href="/results" className="hidden rounded-lg px-2 py-1 text-sm font-semibold text-brand-800 hover:bg-brand-50 sm:block lg:hidden">
+              <Link
+                href="/results"
+                aria-current={active("/results") ? "page" : undefined}
+                className="hidden items-center gap-2 rounded-full bg-[#ffffff] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.12em] text-[#04121a] transition hover:scale-[1.03] sm:inline-flex"
+              >
+                <LayoutDashboard className="h-3.5 w-3.5" aria-hidden />
                 {tr("My results")}
               </Link>
             )}
-            <LanguageSelector compact />
           </div>
         </div>
       </header>
 
-      <main id="main" className="pb-24 lg:pb-10 lg:pl-64">
-        <div className="mx-auto max-w-5xl px-4 py-5 sm:py-8">{children}</div>
+      <main id="main" className="pb-32 lg:pb-12">
+        <div className="mx-auto max-w-5xl px-5 py-8 sm:py-12">{children}</div>
+        <footer className="mx-auto max-w-5xl px-5 pb-6 text-xs text-ink-muted">
+          <div className="flex flex-col gap-2 border-t border-white/[0.08] pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <p>{tr("MedLens explains your paperwork in plain language. It is not a doctor and does not give medical advice. In an emergency call 911.")}</p>
+            <p className="flex shrink-0 gap-4">
+              <Link href="/privacy" className="hover:text-white">
+                {tr("Privacy Policy")}
+              </Link>
+              <Link href="/terms" className="hover:text-white">
+                {tr("Terms & Disclaimers")}
+              </Link>
+            </p>
+          </div>
+        </footer>
       </main>
 
-      {/* Mobile bottom navigation */}
-      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-navy-900/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
+      {/* Phone navigation: a floating glass bar */}
+      <nav
+        aria-label="Main"
+        className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 rounded-2xl border border-white/10 bg-navy-900/80 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.8)] backdrop-blur-xl lg:hidden"
+      >
         <ul className="grid grid-cols-6">
           {NAV.map((n) => (
             <li key={n.href}>
@@ -130,8 +130,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 href={n.href}
                 aria-current={active(n.href) ? "page" : undefined}
                 className={cx(
-                  "flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium",
-                  active(n.href) ? "text-brand-700" : "text-ink-muted",
+                  "flex flex-col items-center gap-1 py-2.5 text-[10px] font-semibold uppercase tracking-[0.08em]",
+                  active(n.href) ? "text-brand-500" : "text-ink-muted",
                 )}
               >
                 <n.icon className="h-5 w-5" aria-hidden />

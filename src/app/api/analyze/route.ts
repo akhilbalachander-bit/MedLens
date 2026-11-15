@@ -1,6 +1,7 @@
 import { AIError, generateJson, getProviderConfig } from "@/lib/ai/provider";
 import { ANALYSIS_SYSTEM, analysisPrompt } from "@/lib/ai/prompts";
 import { AnalysisSchema, normalizeAnalysis, type AnalysisResult } from "@/lib/schema";
+import { scrubDeep } from "@/lib/privacy/scrubOutput";
 import { checkRateLimit } from "@/lib/server/rate-limit";
 import { errorResponse, readUploads } from "@/lib/server/uploads";
 import { sampleResult } from "@/lib/sample/discharge";
@@ -46,14 +47,15 @@ export async function POST(req: Request) {
       throw new AIError("invalid_response", "The AI response did not match the expected format. Please try again.");
     }
     const result: AnalysisResult = {
-      ...normalizeAnalysis(parsed.data),
+      // Second privacy net: scrub anything personal the AI may have written.
+      ...scrubDeep(normalizeAnalysis(parsed.data)),
       meta: {
         source: "ai",
         provider: cfg.provider,
         model: cfg.model,
         analyzed_at: new Date().toISOString(),
         page_count: files.length,
-        file_names: files.map((f) => f.name),
+        file_names: files.map((_, i) => `page-${i + 1}`),
       },
     };
     return Response.json(result);

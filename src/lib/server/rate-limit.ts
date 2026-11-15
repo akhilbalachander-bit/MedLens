@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash, randomBytes } from "node:crypto";
 import { AIError } from "@/lib/ai/provider";
 
 /**
@@ -20,9 +21,13 @@ export type Bucket = keyof typeof LIMITS;
 
 const hits = new Map<string, number[]>();
 
+// Visitors are counted by a salted hash of their IP address, never the address
+// itself; the salt is random per server instance and never stored.
+const SALT = randomBytes(16).toString("hex");
 export function clientIp(req: Request): string {
   const fwd = req.headers.get("x-forwarded-for");
-  return (fwd?.split(",")[0] ?? req.headers.get("x-real-ip") ?? "local").trim();
+  const ip = (fwd?.split(",")[0] ?? req.headers.get("x-real-ip") ?? "local").trim();
+  return createHash("sha256").update(SALT + ip).digest("hex").slice(0, 24);
 }
 
 export function checkRateLimit(req: Request, bucket: Bucket, now = Date.now()): void {

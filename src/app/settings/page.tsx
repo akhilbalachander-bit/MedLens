@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Bell, Bot, CheckCircle2, Languages, Plus, Settings, ShieldCheck, Trash2, Type, Volume2, XCircle } from "lucide-react";
 import { useMedLens } from "@/lib/store";
 import { useSpeech } from "@/components/speech/SpeechContext";
@@ -264,10 +265,16 @@ export default function SettingsPage() {
       <Card>
         <SectionTitle icon={<ShieldCheck className="h-5 w-5" />}>{tr("Privacy")}</SectionTitle>
         <ul className="list-disc space-y-1 pl-5 text-sm text-ink-soft">
-          <li>{tr("No account or login. MedLens does not keep your uploaded documents — they are sent once for analysis and discarded.")}</li>
+          <li>{tr("Personal details (names, birth dates, addresses, phone numbers, ID numbers) are covered on your device before anything is sent. The AI only sees medical text.")}</li>
+          <li>{tr("No account or login, and no database: MedLens does not keep your documents or results on its servers.")}</li>
           <li>{tr("Your results, checklist and reminders are kept only in this browser tab's session storage and disappear when the session ends.")}</li>
           <li>{tr("Only preferences (language, voice, speed, text size) are remembered on this device.")}</li>
         </ul>
+        <p className="mt-3 text-sm">
+          <Link href="/privacy" className="font-semibold text-brand-800 underline">
+            {tr("Read the Privacy Policy")}
+          </Link>
+        </p>
         <button
           className={cx(btn.secondary, "mt-3 text-red-700")}
           onClick={() => {

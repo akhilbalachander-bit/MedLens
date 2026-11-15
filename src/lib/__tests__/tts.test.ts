@@ -81,7 +81,7 @@ describe("synthesize", () => {
     expect(out.audio.length).toBe(54);
   });
 
-  it("caches repeated text", async () => {
+  it("keeps no copy of spoken text on the server (each request is synthesized fresh)", async () => {
     process.env.GOOGLE_TTS_API_KEY = "t";
     process.env.GOOGLE_TTS_VOICE = "";
     const f = vi.fn(async () => Response.json({ audioContent: "AAAA" }));
@@ -89,7 +89,7 @@ describe("synthesize", () => {
     const cfg = getTtsConfig()!;
     await synthesize(cfg, "same text unique-3", "hi-IN", "Hindi");
     await synthesize(cfg, "same text unique-3", "hi-IN", "Hindi");
-    expect(f).toHaveBeenCalledTimes(1);
+    expect(f).toHaveBeenCalledTimes(2);
   });
 
   it("reports provider errors", async () => {

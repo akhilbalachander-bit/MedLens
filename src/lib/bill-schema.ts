@@ -141,7 +141,7 @@ export const BILL_JSON_SHAPE = `{
   "extraction_status": "success | partial | failed",
   "is_itemized": "boolean (does the bill list individual services/charges?)",
   "facility_name": "string | null", "facility_address": "string | null", "facility_phone": "string | null",
-  "patient_account_number": "string | null", "statement_date": "string | null", "service_dates": "string | null",
+  "patient_account_number": "always null (never copy account numbers)", "statement_date": "string | null", "service_dates": "string | null",
   "total_charges": "number | null", "insurance_payments": "number | null", "adjustments": "number | null",
   "amount_due": "number | null", "due_date": "string | null",
   "line_items": [{ "id": "li-1", "service_date": "string | null", "code": "string | null (CPT/HCPCS/revenue code as printed)",

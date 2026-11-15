@@ -1,6 +1,7 @@
 import { AIError, generateJson, getProviderConfig } from "@/lib/ai/provider";
 import { BILL_SYSTEM, billPrompt } from "@/lib/ai/prompts";
 import { BillAnalysisSchema, normalizeBill, type BillAnalysisResult } from "@/lib/bill-schema";
+import { scrubDeep } from "@/lib/privacy/scrubOutput";
 import { checkRateLimit } from "@/lib/server/rate-limit";
 import { errorResponse, readUploads } from "@/lib/server/uploads";
 import { sampleBillResult } from "@/lib/sample/bill";
@@ -32,7 +33,7 @@ export async function POST(req: Request) {
     const parsed = BillAnalysisSchema.safeParse(raw);
     if (!parsed.success) throw new AIError("invalid_response", "The AI response did not match the expected bill format.");
     const result: BillAnalysisResult = {
-      ...normalizeBill(parsed.data),
+      ...scrubDeep(normalizeBill(parsed.data)),
       meta: { source: "ai", provider: cfg.provider, analyzed_at: new Date().toISOString() },
     };
     return Response.json(result);

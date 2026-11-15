@@ -504,3 +504,12 @@ html.ml-custom-cursor .ml-cursor-outer {
     filter: none !important;
   }
 }
+
+.ml-foot-link {
+  color: rgba(255, 255, 255, 0.75);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ml-foot-link:hover {
+  color: #5fe9f0;
+}

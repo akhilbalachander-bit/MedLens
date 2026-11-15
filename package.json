@@ -7,14 +7,20 @@
     "build": "next build",
     "start": "next start -p 3000",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "postinstall": "node scripts/copy-vendor.mjs",
+    "prebuild": "node scripts/copy-vendor.mjs"
   },
   "dependencies": {
+    "@tesseract.js-data/eng": "1.0.0",
     "lucide-react": "1.73.0",
     "next": "15.5.29",
+    "pdfjs-dist": "5.7.284",
     "react": "19.1.1",
     "react-dom": "19.1.1",
     "server-only": "^0.0.1",
+    "tesseract.js": "7.0.0",
+    "tesseract.js-core": "7.0.0",
     "three": "0.160.0",
     "zod": "3.25.76"
   },

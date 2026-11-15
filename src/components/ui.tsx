@@ -6,12 +6,16 @@ export function cx(...c: (string | false | null | undefined)[]) {
 
 export function Card({ children, className, id }: { children: ReactNode; className?: string; id?: string }) {
   return (
-    <section id={id} className={cx("rounded-2xl border border-slate-200 bg-white p-4 shadow-card sm:p-5", className)}>
+    <section id={id} className={cx("ml-panel p-5 sm:p-6", className)}>
       {children}
     </section>
   );
 }
 
+/**
+ * Section heading in the editorial style: a large teal index (01, 02…, counted
+ * automatically per page) and the title.
+ */
 export function SectionTitle({
   icon,
   children,
@@ -24,9 +28,9 @@ export function SectionTitle({
   as?: "h2" | "h3";
 }) {
   return (
-    <div className="mb-3 flex items-start justify-between gap-3">
-      <Tag className={cx("flex items-center gap-2 font-semibold text-ink", Tag === "h2" ? "text-lg" : "text-base")}>
-        {icon && <span className="text-brand-700">{icon}</span>}
+    <div className="mb-4 flex items-start justify-between gap-3">
+      <Tag className={cx("sec-title flex items-center gap-2 font-semibold text-ink", Tag === "h2" ? "text-lg sm:text-xl" : "text-base")}>
+        {icon && <span className="text-brand-500 [&>svg]:h-4 [&>svg]:w-4">{icon}</span>}
         <span>{children}</span>
       </Tag>
       {action}
@@ -35,30 +39,27 @@ export function SectionTitle({
 }
 
 const badgeTones = {
-  slate: "bg-slate-100 text-slate-700",
-  green: "bg-emerald-100 text-emerald-800",
-  amber: "bg-amber-100 text-amber-900",
-  red: "bg-red-100 text-red-800",
-  blue: "bg-sky-100 text-sky-800",
-  brand: "bg-brand-100 text-brand-800",
+  slate: "border-white/10 bg-white/[0.04] text-ink-soft",
+  green: "border-emerald-300/40 bg-emerald-50 text-emerald-800",
+  amber: "border-amber-300/50 bg-amber-50 text-amber-800",
+  red: "border-red-300/50 bg-red-50 text-red-800",
+  blue: "border-sky-200/60 bg-sky-50 text-sky-800",
+  brand: "border-brand-300/60 bg-brand-50 text-brand-800",
 };
 export function Badge({ children, tone = "slate" }: { children: ReactNode; tone?: keyof typeof badgeTones }) {
   return (
-    <span className={cx("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium", badgeTones[tone])}>
+    <span className={cx("inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em]", badgeTones[tone])}>
       {children}
     </span>
   );
 }
 
+const focus = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500";
 export const btn = {
-  primary:
-    "inline-flex items-center justify-center gap-2 rounded-xl bg-brand-700 px-4 py-2.5 font-semibold text-white shadow-sm hover:bg-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:cursor-not-allowed disabled:opacity-50",
-  secondary:
-    "inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 font-medium text-ink hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:cursor-not-allowed disabled:opacity-50",
-  ghost:
-    "inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-brand-800 hover:bg-brand-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-700 disabled:opacity-50",
-  danger:
-    "inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 font-semibold text-white hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600",
+  primary: `inline-flex items-center justify-center gap-2 rounded-full bg-[#12b3bf] px-5 py-2.5 font-semibold text-[#021015] shadow-[0_10px_30px_-12px_rgba(18,179,191,0.9)] transition hover:bg-[#2fd0da] disabled:cursor-not-allowed disabled:opacity-50 ${focus}`,
+  secondary: `inline-flex items-center justify-center gap-2 rounded-full border border-white/20 bg-white/[0.03] px-5 py-2.5 font-medium text-ink transition hover:border-brand-400 hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50 ${focus}`,
+  ghost: `inline-flex items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-brand-800 transition hover:bg-white/[0.06] disabled:opacity-40 ${focus}`,
+  danger: `inline-flex items-center justify-center gap-2 rounded-full bg-red-600 px-5 py-2.5 font-semibold text-white transition hover:bg-red-500 ${focus}`,
 };
 
 export function Notice({
@@ -73,13 +74,16 @@ export function Notice({
   className?: string;
 }) {
   const tones = {
-    info: "border-sky-200 bg-sky-50 text-sky-900",
-    warning: "border-amber-300 bg-amber-50 text-amber-950",
-    danger: "border-red-300 bg-red-50 text-red-900",
-    success: "border-emerald-200 bg-emerald-50 text-emerald-900",
+    info: "border-sky-200 bg-sky-50/80 text-sky-900 [--accent:#5ab8ff]",
+    warning: "border-amber-300 bg-amber-50/80 text-amber-950 [--accent:#f5b62e]",
+    danger: "border-red-300 bg-red-50/80 text-red-900 [--accent:#f87171]",
+    success: "border-emerald-200 bg-emerald-50/80 text-emerald-900 [--accent:#34d399]",
   };
   return (
-    <div role={tone === "danger" ? "alert" : undefined} className={cx("flex gap-3 rounded-xl border p-3 text-sm", tones[tone], className)}>
+    <div
+      role={tone === "danger" ? "alert" : undefined}
+      className={cx("flex gap-3 rounded-2xl border border-l-[3px] p-3.5 text-sm [border-left-color:var(--accent)]", tones[tone], className)}
+    >
       {icon && <span className="mt-0.5 shrink-0">{icon}</span>}
       <div className="min-w-0 flex-1">{children}</div>
     </div>

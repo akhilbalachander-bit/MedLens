@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { AIError, generateJson, getProviderConfig } from "@/lib/ai/provider";
 import { ASSISTANT_SYSTEM } from "@/lib/ai/prompts";
+import { scrubText } from "@/lib/privacy/redact";
 import { checkRateLimit } from "@/lib/server/rate-limit";
 import { errorResponse } from "@/lib/server/uploads";
 import { detectEmergency } from "@/lib/emergency";
@@ -24,7 +25,10 @@ export async function POST(req: Request) {
     checkRateLimit(req, "assistant");
     const parsed = Body.safeParse(await req.json().catch(() => null));
     if (!parsed.success) throw new AIError("unsupported_file", "Invalid question.", 400);
-    const { question, language, context, history } = parsed.data;
+    // Scrub anything personal a patient may have typed (email, phone, ID numbers…).
+    const question = scrubText(parsed.data.question);
+    const history = parsed.data.history.map((h) => ({ ...h, text: scrubText(h.text) }));
+    const { language, context } = parsed.data;
     const cfg = getProviderConfig();
     if (!cfg || cfg.provider === "mock") {
       throw new AIError("provider_not_configured", "The AI assistant needs an AI provider.", 503);

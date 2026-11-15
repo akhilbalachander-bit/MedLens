@@ -6,6 +6,9 @@ import { ACCEPT_ATTR, resolveMime } from "@/lib/files";
 import { useMedLens } from "@/lib/store";
 import { btn, cx, Notice } from "../ui";
 import { CameraCapture, CameraFallback } from "./CameraCapture";
+import { PrivacyReview } from "./PrivacyReview";
+import { maskedFile, preloadShield, shieldFiles, type ShieldPage, type ShieldProgress } from "@/lib/privacy/shield";
+import { Loader2, Lock } from "lucide-react";
 import { useTr } from "@/lib/i18n";
 
 export type Page = { id: string; file: File; url: string | null; kind: "image" | "pdf" };
@@ -43,6 +46,38 @@ export function DocumentCapture({
   const [camera, setCamera] = useState(false);
   const [camError, setCamError] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
+  // Privacy check: pages are covered on this device before anything is sent.
+  const [shield, setShield] = useState<{ stage: "idle" | "working" | "review" | "sending"; pages: ShieldPage[]; progress: ShieldProgress | null }>({
+    stage: "idle",
+    pages: [],
+    progress: null,
+  });
+  useEffect(() => {
+    if (pages.length) preloadShield();
+  }, [pages.length]);
+
+  const startShield = async () => {
+    setFileError(null);
+    setShield({ stage: "working", pages: [], progress: null });
+    try {
+      const result = await shieldFiles(pages.map((p) => p.file), maxFiles, (progress) => setShield((s) => ({ ...s, progress })));
+      setShield({ stage: "review", pages: result, progress: null });
+    } catch (e) {
+      setShield({ stage: "idle", pages: [], progress: null });
+      setFileError(tr((e as Error).message || "This file could not be prepared. Please try a photo instead."));
+    }
+  };
+  const confirmShield = async () => {
+    setShield((s) => ({ ...s, stage: "sending" }));
+    try {
+      const files = await Promise.all(shield.pages.map((p, i) => maskedFile(p, i)));
+      onAnalyze(files);
+    } catch (e) {
+      setFileError(tr((e as Error).message));
+    } finally {
+      setShield((s) => ({ ...s, stage: "review" }));
+    }
+  };
   const uploadRef = useRef<HTMLInputElement>(null);
   const started = useRef(false);
   const maxFiles = provider?.maxFiles ?? 8;
@@ -124,6 +159,37 @@ export function DocumentCapture({
     setCamera(true);
   };
 
+  if (shield.stage === "working") {
+    const p = shield.progress;
+    return (
+      <div className="ml-panel p-6" role="status" aria-live="polite">
+        <p className="eyebrow flex items-center gap-2">
+          <Lock className="h-3.5 w-3.5" /> {tr("Privacy check — on your device")}
+        </p>
+        <p className="mt-3 flex items-center gap-3 text-lg text-ink">
+          <Loader2 className="h-5 w-5 animate-spin text-brand-500" />
+          {p?.stage === "reading"
+            ? tr("Covering personal details — page {n} of {total}", { n: p.page, total: p.total })
+            : tr("Preparing the privacy check…")}
+        </p>
+        <p className="mt-2 text-sm text-ink-muted">
+          {tr("Your document stays on this device during this step. The first time, the privacy tools take a few seconds to load.")}
+        </p>
+      </div>
+    );
+  }
+  if (shield.stage === "review" || shield.stage === "sending") {
+    return (
+      <PrivacyReview
+        pages={shield.pages}
+        busy={shield.stage === "sending" || disabled}
+        onChange={(next) => setShield((s) => ({ ...s, pages: next }))}
+        onBack={() => setShield({ stage: "idle", pages: [], progress: null })}
+        onConfirm={() => void confirmShield()}
+      />
+    );
+  }
+
   return (
     <div>
       {uploadInput}
@@ -146,7 +212,7 @@ export function DocumentCapture({
               type="button"
               onClick={openCamera}
               disabled={disabled}
-              className="group flex min-h-[150px] flex-col items-start justify-between rounded-3xl bg-brand-700 p-5 text-left text-white shadow-card hover:bg-brand-600 focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-brand-300 disabled:opacity-50"
+              className="group relative flex min-h-[170px] flex-col items-start justify-between overflow-hidden rounded-[28px] bg-[radial-gradient(120%_120%_at_100%_0%,#2fd0da_0%,#0f8f9b_45%,#0a4f63_100%)] p-6 text-left text-white shadow-[0_24px_60px_-24px_rgba(18,179,191,0.8)] transition hover:brightness-110 focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-brand-300 disabled:opacity-50"
             >
               <span className="grid h-14 w-14 place-items-center rounded-2xl bg-white/15">
                 <Camera className="h-8 w-8" aria-hidden />
@@ -160,7 +226,7 @@ export function DocumentCapture({
               type="button"
               onClick={() => uploadRef.current?.click()}
               disabled={disabled}
-              className="group flex min-h-[150px] flex-col items-start justify-between rounded-3xl border-2 border-brand-200 bg-white p-5 text-left shadow-card hover:border-brand-400 hover:bg-brand-50 focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-brand-300 disabled:opacity-50"
+              className="ml-panel group flex min-h-[170px] flex-col items-start justify-between p-6 text-left transition hover:border-brand-400 focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-brand-300 disabled:opacity-50"
             >
               <span className="grid h-14 w-14 place-items-center rounded-2xl bg-brand-50 text-brand-700">
                 <Upload className="h-8 w-8" aria-hidden />
@@ -262,12 +328,12 @@ export function DocumentCapture({
             >
               {tr("Start over")}
             </button>
-            <button onClick={() => onAnalyze(pages.map((p) => p.file))} disabled={disabled} className={cx(btn.primary, "py-3 text-lg")}>
+            <button onClick={() => void startShield()} disabled={disabled} className={cx(btn.primary, "py-3 text-lg")}>
               {tr(analyzeLabel)} ({pages.length > 1 ? tr("{count} pages", { count: pages.length }) : tr("1 page")})
             </button>
           </div>
           <p className="mt-3 flex items-center gap-2 text-xs text-ink-muted">
-            <ShieldCheck className="h-4 w-4 text-brand-700" /> {tr("Your document is sent once for analysis and is not stored by MedLens.")}
+            <ShieldCheck className="h-4 w-4 text-brand-700" /> {tr("Personal details are covered on your device first. Only the medical text is sent, once, and nothing is stored.")}
           </p>
         </div>
       )}
