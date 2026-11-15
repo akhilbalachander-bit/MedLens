@@ -71,7 +71,6 @@ export function Landing() {
   const slideRefs = useRef<(HTMLElement | null)[]>([]);
   const imageRef = useRef<HTMLDivElement>(null);
   const dashRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const dotsRef = useRef<HTMLDivElement>(null);
   const cursorInner = useRef<HTMLDivElement>(null);
   const cursorOuter = useRef<HTMLDivElement>(null);
   const [webglFailed, setWebglFailed] = useState(false);
@@ -128,7 +127,6 @@ export function Landing() {
     window.addEventListener("pointermove", onMove, { passive: true });
     window.addEventListener("resize", onResize);
 
-    const dots = Array.from(dotsRef.current?.querySelectorAll<HTMLElement>(".ml-grid-dot") ?? []);
     // Smoothing factors are "per frame at 60 fps"; scale them by real elapsed
     // time so the feel is the same on a slow phone and a 120 Hz screen.
     const ease = (perFrame: number, dt: number) => 1 - Math.pow(1 - perFrame, dt * 60);
@@ -171,14 +169,6 @@ export function Landing() {
         const p = Math.max(0, Math.min(1, (state.scroll - i * 0.25) / 0.25));
         d.style.height = `${p * 100}%`;
       });
-      // Dots drift along the grid lines with the scroll.
-      dots.forEach((dot, i) => {
-        const startY = ((i * 17) % 80) + 10;
-        let speed = 90 + ((i * 55) % 180);
-        if (i % 2 === 0) speed = -speed;
-        const y = (((startY + state.scroll * speed) % 100) + 100) % 100;
-        dot.style.top = `${y}%`;
-      });
     };
     loop();
 
@@ -202,30 +192,18 @@ export function Landing() {
 
       <canvas ref={canvasRef} className="ml-webgl" aria-hidden />
 
-      <div className="ml-grid-hline" aria-hidden />
-      <div ref={dotsRef} className="ml-grid" aria-hidden>
+      {/* Scroll progress: one dash per slide. */}
+      <div className="ml-progress" aria-hidden>
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="ml-grid-line">
-            <div className="ml-grid-dot" />
-            <div className="ml-grid-dot" />
+          <div key={i} className="ml-dash">
+            <div
+              className="ml-dash-fill"
+              ref={(el) => {
+                dashRefs.current[i] = el;
+              }}
+            />
           </div>
         ))}
-        <div className="ml-grid-line">
-          <div className="ml-grid-dot" />
-          <div className="ml-grid-dot" />
-          <div className="ml-dashes">
-            {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="ml-dash">
-                <div
-                  className="ml-dash-fill"
-                  ref={(el) => {
-                    dashRefs.current[i] = el;
-                  }}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
 
       <div ref={imageRef} className="ml-image-mask" aria-hidden>
