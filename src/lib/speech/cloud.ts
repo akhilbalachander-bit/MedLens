@@ -67,6 +67,8 @@ export class CloudSpeechEngine implements SpeechEngine {
   private cache = new Map<string, Promise<string>>();
   private failedLocales = new Map<string, number>();
   private usingFallback = false;
+  /** Until when natural voices are skipped because their free limit was reached. */
+  private limitUntil = 0;
   private paused = false;
   /** Set when the next piece arrived while paused: playing it is what Resume does. */
   private resumePending: (() => void) | null = null;
@@ -118,7 +120,9 @@ export class CloudSpeechEngine implements SpeechEngine {
           return await once();
         } catch (e) {
           const status = (e as { status?: number }).status ?? 0;
-          const retryable = status === 0 || status === 429 || status >= 500;
+          // Overloaded or network hiccup: retry. Free limit reached (429): never
+          // retry, it only uses up more of the allowance.
+          const retryable = status === 0 || status >= 500;
           if (!retryable || attempt >= 2) throw e;
           await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
         }
@@ -145,6 +149,12 @@ export class CloudSpeechEngine implements SpeechEngine {
     const failedAt = this.failedLocales.get(locale);
     if (failedAt && Date.now() - failedAt < 10 * 60_000) {
       this.handOff(chunks.join(" "), opts, null);
+      return;
+    }
+    // Natural voices hit their free limit recently: use the device voice right
+    // away instead of making the patient wait for requests that will fail.
+    if (Date.now() < this.limitUntil) {
+      this.handOff(chunks.join(" "), opts, null, false, true);
       return;
     }
 
@@ -190,7 +200,6 @@ export class CloudSpeechEngine implements SpeechEngine {
         opts.onEnd?.();
         return;
       }
-      prefetch(i + 1);
       let url: string;
       try {
         url = await this.fetchChunk(chunks[i], opts.lang);
@@ -198,10 +207,13 @@ export class CloudSpeechEngine implements SpeechEngine {
         if (my !== this.token) return;
         const status = (e as { status?: number }).status;
         if (status === 400) this.failedLocales.set(locale, Date.now());
-        this.handOff(chunks.slice(i).join(" "), opts, (e as Error).message, started);
+        if (status === 429) this.limitUntil = Date.now() + 5 * 60_000;
+        this.handOff(chunks.slice(i).join(" "), opts, (e as Error).message, started, status === 429);
         return;
       }
       if (my !== this.token) return;
+      // Request ahead only once the service is answering (no wasted requests when it is not).
+      prefetch(i + 1);
       // Paused while this piece was loading: wait for Resume instead of playing.
       if (this.paused) {
         this.resumePending = () => void start(i, url);
@@ -212,16 +224,24 @@ export class CloudSpeechEngine implements SpeechEngine {
     void playAt(0);
   }
 
-  private handOff(rest: string, opts: SpeakOptions, reason: string | null, started = false) {
+  private handOff(rest: string, opts: SpeakOptions, reason: string | null, started = false, limit = false) {
     if (reason) console.warn(`Online voice unavailable: ${reason}`);
     // Never read a language with a voice that does not speak it (that sounds
     // like English): only fall back when this device has a matching voice.
     if (!voicesForLanguage(this.fallback.getVoices(), opts.lang).length) {
-      opts.onError?.("The natural voice is busy right now. Please tap Listen again in a moment.");
+      opts.onError?.(
+        limit
+          ? "Natural voices have reached their free limit for now, and this device has no voice for this language. Please try again later."
+          : "The natural voice is busy right now. Please tap Listen again in a moment.",
+      );
       return;
     }
     this.usingFallback = true;
-    opts.onNotice?.("The online voice is unavailable right now. Using this device's voice instead.");
+    opts.onNotice?.(
+      limit
+        ? "Natural voices have reached their free limit for now. Using this device's voice instead."
+        : "The online voice is unavailable right now. Using this device's voice instead.",
+    );
     this.fallback.speak(rest, { ...opts, onStart: started ? undefined : opts.onStart, voiceId: null });
   }
 

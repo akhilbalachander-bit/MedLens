@@ -114,7 +114,11 @@ describe("packChunks", async () => {
 describe("Gemini voice resilience", () => {
   const audio = () => Response.json({ candidates: [{ content: { parts: [{ inlineData: { mimeType: "audio/L16;rate=24000", data: "AAAA" } }] } }] });
   const err = (status: number, message: string) => new Response(JSON.stringify({ error: { message } }), { status });
-  function fake(gen: (model: string, body: Record<string, any>) => Response, listed: string[] = []) {
+  function fake(
+    gen: (model: string, body: Record<string, any>) => Response,
+    listed: string[] = [],
+    cloud: () => Response = () => err(403, "Cloud Text-to-Speech API has not been used in project 123 or it is disabled."),
+  ) {
     const calls: string[] = [];
     vi.stubGlobal(
       "fetch",
@@ -122,6 +126,10 @@ describe("Gemini voice resilience", () => {
         if (/\/models\?/.test(url)) {
           calls.push("LIST");
           return Response.json({ models: listed.map((m) => ({ name: `models/${m}` })) });
+        }
+        if (url.includes("texttospeech")) {
+          calls.push("CLOUD");
+          return cloud();
         }
         const m = /models\/([^:]+):/.exec(url)![1];
         calls.push(m);
@@ -146,7 +154,7 @@ describe("Gemini voice resilience", () => {
     const calls = fake((m) => (m === "gemini-4.0-flash-tts" ? audio() : err(404, "not found")), ["gemini-2.5-flash-preview-tts", "gemini-4.0-flash-tts", "gemini-4.0-flash"]);
     const out = await synthesize(getTtsConfig()!, "hi unique-a", "en-US", "English");
     expect(out.mimeType).toBe("audio/wav");
-    expect(calls).toEqual(["gemini-3.8-flash-tts", "LIST", "gemini-3.8-flash-lite-tts", "gemini-4.0-flash-tts"]);
+    expect(calls).toEqual(["LIST", "gemini-3.8-flash-tts", "gemini-3.8-flash-lite-tts", "gemini-4.0-flash-tts"]);
     expect(getTtsConfig()!.model).toBe("gemini-4.0-flash-tts");
   });
 
@@ -166,7 +174,35 @@ describe("Gemini voice resilience", () => {
     process.env.GEMINI_API_KEY = "g";
     const calls = fake((m) => (m.includes("lite") ? audio() : err(503, "high demand")));
     await synthesize(getTtsConfig()!, "hi unique-c", "en-US", "English");
-    expect(calls).toEqual(["gemini-3.8-flash-tts", "gemini-3.8-flash-tts", "gemini-3.8-flash-lite-tts"]);
+    expect(calls).toEqual(["LIST", "gemini-3.8-flash-tts", "gemini-3.8-flash-tts", "gemini-3.8-flash-lite-tts"]);
+  });
+
+  it("free limit reached: tries every voice model once (no retries), then Google Cloud TTS with the same key", async () => {
+    process.env.GEMINI_API_KEY = "g";
+    const calls = fake(
+      () => err(429, "You exceeded your current quota"),
+      ["gemini-3.8-flash-tts", "gemini-3.1-flash-tts-preview", "gemini-2.5-flash-preview-tts"],
+      () => Response.json({ audioContent: Buffer.from("mp3").toString("base64") }),
+    );
+    const out = await synthesize(getTtsConfig()!, "hola unique-q1", "es-US", "Spanish");
+    expect(out.mimeType).toBe("audio/mpeg");
+    expect(calls).toEqual([
+      "LIST",
+      "gemini-3.8-flash-tts",
+      "gemini-3.8-flash-lite-tts",
+      "gemini-3.1-flash-tts-preview",
+      "gemini-2.5-flash-preview-tts",
+      "CLOUD",
+    ]);
+  });
+
+  it("free limit reached and no Cloud TTS: says so (429) and stops asking Google for a while", async () => {
+    process.env.GEMINI_API_KEY = "g";
+    const calls = fake(() => err(429, "You exceeded your current quota"), ["gemini-3.8-flash-tts"]);
+    await expect(synthesize(getTtsConfig()!, "hi unique-q2", "en-US", "English")).rejects.toMatchObject({ status: 429, code: "quota" });
+    const before = calls.length;
+    await expect(synthesize(getTtsConfig()!, "hi unique-q3", "en-US", "English")).rejects.toMatchObject({ status: 429 });
+    expect(calls.length).toBe(before); // paused: no new requests to Google at all
   });
 
   it("says 'busy' (503) when every voice model is busy", async () => {
